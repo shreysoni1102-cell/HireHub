@@ -1,3 +1,4 @@
+// Job Controller — CRUD for job postings (recruiter only)
 import Job from '../models/Job.js';
 
 /** Public: list all jobs */
@@ -87,3 +88,4 @@ export async function deleteJob(req, res, next) {
     next(err);
   }
 }
+
