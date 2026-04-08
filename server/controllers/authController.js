@@ -1,3 +1,4 @@
+// Auth Controller — handles register, login with JWT
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
@@ -72,3 +73,4 @@ export async function login(req, res, next) {
     next(err);
   }
 }
+
