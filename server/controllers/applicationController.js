@@ -1,3 +1,4 @@
+// Application Controller — job application submission and status management
 import Application from '../models/Application.js';
 import Job from '../models/Job.js';
 import { sendStatusUpdateEmail } from '../utils/emailService.js';
@@ -102,3 +103,4 @@ export async function updateApplicationStatus(req, res, next) {
     next(err);
   }
 }
+
