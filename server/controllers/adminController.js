@@ -1,3 +1,4 @@
+// Admin Controller — user management for admin role
 import User from '../models/User.js';
 
 /** Admin: list all users (no passwords) */
@@ -27,3 +28,4 @@ export async function deleteUser(req, res, next) {
     next(err);
   }
 }
+
