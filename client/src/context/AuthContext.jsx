@@ -1,3 +1,4 @@
+// AuthContext — provides user auth state and login/logout across app
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import api from '../api/axios.js';
 
@@ -63,3 +64,4 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
+
