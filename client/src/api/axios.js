@@ -1,3 +1,4 @@
+// Axios instance — auto-attaches JWT Bearer token from localStorage
 import axios from 'axios';
 
 /**
@@ -20,3 +21,4 @@ api.interceptors.request.use((config) => {
 });
 
 export default api;
+
