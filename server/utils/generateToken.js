@@ -1,3 +1,4 @@
+// generateToken — signs JWT with user id and role
 import jwt from 'jsonwebtoken';
 
 /**
@@ -8,3 +9,4 @@ export function generateToken(userId, role) {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 }
+
