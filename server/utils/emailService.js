@@ -1,3 +1,4 @@
+// emailService — Nodemailer wrapper for sending notification emails
 import nodemailer from 'nodemailer';
 
 /**
@@ -80,3 +81,4 @@ export async function sendStatusUpdateEmail({ toEmail, toName, jobTitle, company
     console.error('[Mailer] Failed to send email:', err.message);
   }
 }
+
