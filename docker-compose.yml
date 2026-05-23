@@ -1,0 +1,16 @@
+# Local MongoDB for HireHub (no auth). Use when you have Docker Desktop installed.
+# From repo root: docker compose up -d
+# Then keep MONGODB_URI=mongodb://127.0.0.1:27017/hirehub in server/.env
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: hirehub-mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - hirehub_mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  hirehub_mongo_data:
