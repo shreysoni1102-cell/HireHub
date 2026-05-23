@@ -13,3 +13,7 @@ ai-service/__pycache__/
 ai-service/*.pyc
 __pycache__/
 *.pyc
+
+# Local documentation
+HIREHUB_SEM7_ROADMAP.md
+implementation_plan.md
