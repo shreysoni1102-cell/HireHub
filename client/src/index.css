@@ -5,3 +5,66 @@
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+/* ── GLOBAL AUTOMATIC DARK MODE OVERRIDES ── */
+.dark body {
+  background-color: #020617 !important; /* slate-950 */
+  color: #f1f5f9 !important; /* slate-100 */
+}
+
+/* Cards & Containers */
+.dark .bg-white {
+  background-color: #0f172a !important; /* slate-900 */
+}
+.dark .bg-slate-50 {
+  background-color: #020617 !important; /* slate-950 */
+}
+.dark .bg-slate-100 {
+  background-color: #1e293b !important; /* slate-800 */
+}
+
+/* Text Colors */
+.dark .text-slate-900 {
+  color: #f8fafc !important; /* slate-50 */
+}
+.dark .text-slate-800 {
+  color: #f1f5f9 !important; /* slate-100 */
+}
+.dark .text-slate-700 {
+  color: #e2e8f0 !important; /* slate-200 */
+}
+.dark .text-slate-600 {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+.dark .text-slate-500 {
+  color: #94a3b8 !important; /* slate-400 */
+}
+
+/* Borders */
+.dark .border-slate-200 {
+  border-color: #1e293b !important; /* slate-800 */
+}
+.dark .border-slate-100 {
+  border-color: #0f172a !important; /* slate-900 */
+}
+
+/* Forms, Inputs, Textareas, Selects */
+.dark input, 
+.dark textarea, 
+.dark select {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+.dark input::placeholder, 
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Interactive & Hover states */
+.dark .hover\:bg-slate-50:hover {
+  background-color: #1e293b !important;
+}
+.dark .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
