@@ -138,7 +138,7 @@ router.post('/ats-check', protect, upload.single('resume'), async (req, res, nex
     }
 
     const analysis = await analyzeResumeATS(resumeText, jobDescription);
-    res.json({ success: true, extractedChars: resumeText.length, data: analysis });
+    res.json({ success: true, extractedChars: resumeText.length, resumeText, data: analysis });
   } catch (err) {
     next(err);
   }
