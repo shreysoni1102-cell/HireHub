@@ -17,6 +17,8 @@ import applicationRoutes from './routes/applicationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
+import interviewRoutes from './routes/interviewRoutes.js';
 
 const app  = express();
 const httpServer = createServer(app);
@@ -90,6 +92,8 @@ app.use('/api/applications', apiLimiter,  applicationRoutes);
 app.use('/api/admin',        apiLimiter,  adminRoutes);
 app.use('/api/ai',           apiLimiter,  aiRoutes);
 app.use('/api/chat',         apiLimiter,  chatRoutes);
+app.use('/api/profile',      apiLimiter,  profileRoutes);
+app.use('/api/interview',    apiLimiter,  interviewRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true, socket: 'enabled' }));
