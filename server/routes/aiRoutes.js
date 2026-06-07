@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { analyzeResumeATS } from '../utils/aiService.js';
+import { analyzeResumeATS, enhanceResumeText } from '../utils/aiService.js';
 import { protect } from '../middleware/auth.js';
 import { extractText } from 'unpdf';
 
@@ -159,6 +159,48 @@ router.post('/ats-check-text', protect, async (req, res, next) => {
     console.log(`[TEXT] Resume text: ${resumeText.length} chars`);
     const analysis = await analyzeResumeATS(resumeText.trim(), jobDescription.trim());
     res.json({ success: true, data: analysis });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @swagger
+ * /api/ai/enhance-resume:
+ *   post:
+ *     summary: AI Resume Summary & Bullet Point Enhancer
+ *     tags: [AI Tools]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [resumeText, jobDescription]
+ *             properties:
+ *               resumeText:
+ *                 type: string
+ *               jobDescription:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Optimized professional summary and bullet points.
+ */
+router.post('/enhance-resume', protect, async (req, res, next) => {
+  try {
+    const { resumeText, jobDescription } = req.body;
+
+    if (!resumeText || resumeText.trim().length < 50) {
+      return res.status(400).json({ message: 'Please provide resume text to enhance.' });
+    }
+    if (!jobDescription || jobDescription.trim().length < 50) {
+      return res.status(400).json({ message: 'Please provide a detailed job description.' });
+    }
+
+    console.log(`[AI Enhance] Optimizing resume text against job description...`);
+    const enhancedData = await enhanceResumeText(resumeText.trim(), jobDescription.trim());
+
+    res.json({ success: true, data: enhancedData });
   } catch (err) {
     next(err);
   }
