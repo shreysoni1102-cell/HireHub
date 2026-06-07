@@ -3,7 +3,8 @@ import Groq from 'groq-sdk';
 
 const AI_MICROSERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5001';
 
-// ─── Shared prompt builder ────────────────────────────────────────────────────
+// ─── Prompt Builders ─────────────────────────────────────────────────────────
+
 function buildPrompt(resumeText, jobDescription) {
   return `
 You are an expert ATS (Applicant Tracking System) resume scanner and professional recruiter.
@@ -65,22 +66,99 @@ Scoring rules:
 `.trim();
 }
 
+function buildProfilePrompt(githubUsername, repos) {
+  const repoSummary = repos.map(r => `Repo: ${r.name}\nDescription: ${r.description || 'No description'}\nLanguage: ${r.language || 'Unknown'}\nStars: ${r.stars || 0}`).join('\n\n');
+  return `
+You are an expert technical recruiter and developer profiler.
+Analyze the following candidate's GitHub repositories and synthesize a professional profile.
+
+GitHub Username: ${githubUsername}
+
+[GitHub Repositories]
+${repoSummary}
+
+Provide a comprehensive, high-quality profile summary in JSON format.
+You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do not wrap in markdown blocks like \`\`\`json):
+{
+  "bio": "A 3-4 sentence professional summary of their coding expertise, domain focus, and key strengths based on their repositories.",
+  "skills": ["Skill 1", "Skill 2", "Skill 3"] // Extracted key technical skills, tools, frameworks, and programming languages (max 12).
+}
+`.trim();
+}
+
+function buildQuestionPrompt(jobTitle, jobDescription, previousQuestions, questionIndex) {
+  const historyText = previousQuestions && previousQuestions.length > 0 
+    ? previousQuestions.map((q, idx) => `Q${idx + 1}: ${q.questionText}\nCandidate Answer: ${q.candidateAnswer || '(Skipped)'}`).join('\n\n')
+    : 'No questions have been asked yet.';
+
+  return `
+You are an expert technical interviewer conducting a mock interview for the role: ${jobTitle}.
+
+[Job Description]
+${jobDescription}
+
+[Interview History]
+${historyText}
+
+You are currently asking Question #${questionIndex + 1} of 5.
+Generate the next single technical or behavioral interview question tailored specifically to this job description and the candidate's previous responses (if any).
+Ensure the question is direct, professional, and challenging.
+Ask ONLY the question text. Do not provide any introduction, explanation, or code blocks.
+`.trim();
+}
+
+function buildEvaluationPrompt(jobTitle, jobDescription, questions) {
+  const QandA = questions.map((q, idx) => `Q${idx + 1}: ${q.questionText}\nCandidate Answer: ${q.candidateAnswer || '(No answer provided)'}`).join('\n\n');
+
+  return `
+You are an expert technical interviewer and hiring manager.
+Analyze the candidate's answers in this mock interview for the role: ${jobTitle}.
+
+[Job Description]
+${jobDescription}
+
+[Interview Questions and Candidate Answers]
+${QandA}
+
+Provide a detailed evaluation report of the candidate's performance in JSON format.
+You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do not wrap in markdown blocks like \`\`\`json):
+{
+  "overallScore": 75, // integer percentage from 0 to 100
+  "technicalScore": 70, // integer percentage from 0 to 100
+  "communicationScore": 80, // integer percentage from 0 to 100
+  "feedback": "Overall summary of the candidate's performance, strengths, and areas to improve.",
+  "questionEvaluations": [
+    {
+      "question": "Question text...",
+      "answer": "Candidate's answer...",
+      "score": 80, // rating from 0 to 100
+      "explanation": "Specific feedback on this answer, what was good, what was missing.",
+      "idealAnswer": "A sample ideal answer showing how the candidate should have answered the question."
+    }
+  ]
+}
+`.trim();
+}
+
+// ─── Utility Parsers ──────────────────────────────────────────────────────────
+
 function parseAIResponse(rawText) {
   const clean = rawText.trim()
     .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
   return JSON.parse(clean);
 }
 
-// ─── Plan 0: Python AI Microservice (:5001) ───────────────────────────────────
-async function analyzeWithMicroservice(resumeText, jobDescription) {
+// ─── Generic Microservice Fetcher ──────────────────────────────────────────────
+
+async function callMicroservice(endpoint, payload) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
   try {
-    const response = await fetch(`${AI_MICROSERVICE_URL}/analyze`, {
+    const response = await fetch(`${AI_MICROSERVICE_URL}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resume_text: resumeText, job_description: jobDescription }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
@@ -90,13 +168,49 @@ async function analyzeWithMicroservice(resumeText, jobDescription) {
     }
 
     const json = await response.json();
-    return json.data; // { ats_score, grade, ... }
+    return json.data;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-// ─── Plan A: Google Gemini 2.0 Flash (direct fallback) ───────────────────────
+// ─── Plan 0: Python AI Microservice Direct Fallbacks ─────────────────────────────
+
+async function analyzeWithMicroservice(resumeText, jobDescription) {
+  return callMicroservice('/analyze', { resume_text: resumeText, job_description: jobDescription });
+}
+
+async function generateProfileWithMicroservice(githubUsername, repos) {
+  return callMicroservice('/profile/github-sync', { github_username: githubUsername, repos });
+}
+
+async function generateQuestionWithMicroservice(jobTitle, jobDescription, previousQuestions, questionIndex) {
+  const payload = {
+    job_title: jobTitle,
+    job_description: jobDescription,
+    previous_questions: previousQuestions.map(q => ({
+      questionText: q.questionText,
+      candidateAnswer: q.candidateAnswer || ''
+    })),
+    question_index: questionIndex
+  };
+  return callMicroservice('/interview/generate-question', payload);
+}
+
+async function evaluateSessionWithMicroservice(jobTitle, jobDescription, questions) {
+  const payload = {
+    job_title: jobTitle,
+    job_description: jobDescription,
+    questions: questions.map(q => ({
+      questionText: q.questionText,
+      candidateAnswer: q.candidateAnswer || ''
+    }))
+  };
+  return callMicroservice('/interview/evaluate', payload);
+}
+
+// ─── Plan A: Google Gemini Direct Fallbacks ──────────────────────────────────────
+
 async function analyzeWithGemini(resumeText, jobDescription) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY not configured');
@@ -106,7 +220,35 @@ async function analyzeWithGemini(resumeText, jobDescription) {
   return parseAIResponse(result.response.text());
 }
 
-// ─── Plan B: Groq Llama-3.3-70B (direct fallback) ────────────────────────────
+async function generateProfileWithGemini(githubUsername, repos) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY not configured');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const result = await model.generateContent(buildProfilePrompt(githubUsername, repos));
+  return parseAIResponse(result.response.text());
+}
+
+async function generateQuestionWithGemini(jobTitle, jobDescription, previousQuestions, questionIndex) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY not configured');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const result = await model.generateContent(buildQuestionPrompt(jobTitle, jobDescription, previousQuestions, questionIndex));
+  return result.response.text().trim();
+}
+
+async function evaluateSessionWithGemini(jobTitle, jobDescription, questions) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY not configured');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const result = await model.generateContent(buildEvaluationPrompt(jobTitle, jobDescription, questions));
+  return parseAIResponse(result.response.text());
+}
+
+// ─── Plan B: Groq Direct Fallbacks ───────────────────────────────────────────────
+
 async function analyzeWithGroq(resumeText, jobDescription) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey === 'your_groq_api_key_here') throw new Error('GROQ_API_KEY not configured');
@@ -120,37 +262,153 @@ async function analyzeWithGroq(resumeText, jobDescription) {
   return parseAIResponse(completion.choices[0]?.message?.content || '');
 }
 
-// ─── Main: Microservice → Gemini → Groq ──────────────────────────────────────
-export async function analyzeResumeATS(resumeText, jobDescription) {
+async function generateProfileWithGroq(githubUsername, repos) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === 'your_groq_api_key_here') throw new Error('GROQ_API_KEY not configured');
+  const groq = new Groq({ apiKey });
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: buildProfilePrompt(githubUsername, repos) }],
+    temperature: 0.3,
+    max_tokens: 1500,
+  });
+  return parseAIResponse(completion.choices[0]?.message?.content || '');
+}
 
-  // Plan 0 — Python AI Microservice (preferred)
+async function generateQuestionWithGroq(jobTitle, jobDescription, previousQuestions, questionIndex) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === 'your_groq_api_key_here') throw new Error('GROQ_API_KEY not configured');
+  const groq = new Groq({ apiKey });
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: buildQuestionPrompt(jobTitle, jobDescription, previousQuestions, questionIndex) }],
+    temperature: 0.3,
+    max_tokens: 500,
+  });
+  return completion.choices[0]?.message?.content?.trim() || '';
+}
+
+async function evaluateSessionWithGroq(jobTitle, jobDescription, questions) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === 'your_groq_api_key_here') throw new Error('GROQ_API_KEY not configured');
+  const groq = new Groq({ apiKey });
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: buildEvaluationPrompt(jobTitle, jobDescription, questions) }],
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
+  return parseAIResponse(completion.choices[0]?.message?.content || '');
+}
+
+// ─── Main Exported Integrations ──────────────────────────────────────────────────
+
+/**
+ * AI ATS Resume Analyzer
+ */
+export async function analyzeResumeATS(resumeText, jobDescription) {
   try {
     console.log('[AI] Trying Plan 0: Python AI Microservice (:5001)...');
-    const result = await analyzeWithMicroservice(resumeText, jobDescription);
-    console.log('[AI] Plan 0 (Python Microservice) succeeded ✅');
-    return result;
+    return await analyzeWithMicroservice(resumeText, jobDescription);
   } catch (msErr) {
-    console.warn('[AI] Plan 0 (Microservice) unavailable:', msErr.message, '— falling back...');
+    console.warn('[AI] Plan 0 unavailable:', msErr.message);
   }
 
-  // Plan A — Gemini direct
   try {
     console.log('[AI] Trying Plan A: Gemini 2.0 Flash (direct)...');
-    const result = await analyzeWithGemini(resumeText, jobDescription);
-    console.log('[AI] Plan A (Gemini direct) succeeded ✅');
-    return result;
+    return await analyzeWithGemini(resumeText, jobDescription);
   } catch (geminiErr) {
-    console.warn('[AI] Plan A (Gemini) failed:', geminiErr.message);
+    console.warn('[AI] Plan A failed:', geminiErr.message);
   }
 
-  // Plan B — Groq direct
   try {
     console.log('[AI] Trying Plan B: Groq Llama-3.3-70B (direct)...');
-    const result = await analyzeWithGroq(resumeText, jobDescription);
-    console.log('[AI] Plan B (Groq direct) succeeded ✅');
-    return result;
+    return await analyzeWithGroq(resumeText, jobDescription);
   } catch (groqErr) {
-    console.error('[AI] Plan B (Groq) failed:', groqErr.message);
-    throw new Error('All AI providers failed. Check service keys and connectivity.');
+    console.error('[AI] Plan B failed:', groqErr.message);
+    throw new Error('All AI providers failed. Check keys and connectivity.');
+  }
+}
+
+/**
+ * AI GitHub Developer Profile Summarizer
+ */
+export async function generateDeveloperProfile(githubUsername, repos) {
+  try {
+    console.log('[AI] Trying Plan 0: Python AI Microservice profile-sync...');
+    return await generateProfileWithMicroservice(githubUsername, repos);
+  } catch (msErr) {
+    console.warn('[AI] Plan 0 profile-sync unavailable:', msErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan A: Gemini 2.0 Flash profile-sync...');
+    return await generateProfileWithGemini(githubUsername, repos);
+  } catch (geminiErr) {
+    console.warn('[AI] Plan A profile-sync failed:', geminiErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B profile-sync...');
+    return await generateProfileWithGroq(githubUsername, repos);
+  } catch (groqErr) {
+    console.error('[AI] Plan B profile-sync failed:', groqErr.message);
+    throw new Error('All AI providers failed to generate profile.');
+  }
+}
+
+/**
+ * AI Sequential Mock Interview Question Generator
+ */
+export async function generateInterviewQuestion(jobTitle, jobDescription, previousQuestions, questionIndex) {
+  try {
+    console.log('[AI] Trying Plan 0: Python AI Microservice question-gen...');
+    const res = await generateQuestionWithMicroservice(jobTitle, jobDescription, previousQuestions, questionIndex);
+    // If microservice returns a structured response, check if it's already a string or holds string data
+    return typeof res === 'string' ? res : (res.question || JSON.stringify(res));
+  } catch (msErr) {
+    console.warn('[AI] Plan 0 question-gen unavailable:', msErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan A: Gemini 2.0 Flash question-gen...');
+    return await generateQuestionWithGemini(jobTitle, jobDescription, previousQuestions, questionIndex);
+  } catch (geminiErr) {
+    console.warn('[AI] Plan A question-gen failed:', geminiErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B question-gen...');
+    return await generateQuestionWithGroq(jobTitle, jobDescription, previousQuestions, questionIndex);
+  } catch (groqErr) {
+    console.error('[AI] Plan B question-gen failed:', groqErr.message);
+    throw new Error('All AI providers failed to generate question.');
+  }
+}
+
+/**
+ * AI Mock Interview Session Scorer and Feedback Generator
+ */
+export async function evaluateInterviewSession(jobTitle, jobDescription, questions) {
+  try {
+    console.log('[AI] Trying Plan 0: Python AI Microservice interview-eval...');
+    return await evaluateSessionWithMicroservice(jobTitle, jobDescription, questions);
+  } catch (msErr) {
+    console.warn('[AI] Plan 0 interview-eval unavailable:', msErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan A: Gemini 2.0 Flash interview-eval...');
+    return await evaluateSessionWithGemini(jobTitle, jobDescription, questions);
+  } catch (geminiErr) {
+    console.warn('[AI] Plan A interview-eval failed:', geminiErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B interview-eval...');
+    return await evaluateSessionWithGroq(jobTitle, jobDescription, questions);
+  } catch (groqErr) {
+    console.error('[AI] Plan B interview-eval failed:', groqErr.message);
+    throw new Error('All AI providers failed to evaluate interview session.');
   }
 }

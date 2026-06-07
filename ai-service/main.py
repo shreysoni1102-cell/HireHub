@@ -5,18 +5,17 @@ Framework: FastAPI + Uvicorn
 Port     : 5001
 
 Responsibilities:
-  - Receive resume text + job description
-  - Analyze using Gemini 2.0 Flash (Plan A) or Groq Llama-3.3-70B (Plan B)
-  - Return structured ATS score JSON
-
-The main Node.js server calls this service via HTTP.
-If this service is offline, the Node.js server falls back to direct AI calls.
+  - ATS resume checking against job description
+  - Synthesize GitHub developer profile details
+  - Generate sequential mock interview questions
+  - Evaluate interview session transcripts
 """
 
 import os
 import json
 import re
 import logging
+from typing import List, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -45,8 +44,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HireHub AI Microservice",
-    description="ATS Resume Scorer — powered by Gemini 2.0 Flash (Plan A) and Groq Llama-3.3-70B (Plan B)",
-    version="1.0.0",
+    description="AI engines powering Resume ATS checks, developer profile syncs, and mock interview preparations",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -58,6 +57,7 @@ app.add_middleware(
 )
 
 # ── Request / Response models ──────────────────────────────────────────────────
+
 class AnalyzeRequest(BaseModel):
     resume_text:      str = Field(..., min_length=50,  description="Extracted text from the candidate's resume PDF")
     job_description:  str = Field(..., min_length=50,  description="Full job description text")
@@ -67,8 +67,59 @@ class AnalyzeResponse(BaseModel):
     provider:     str   # 'gemini' | 'groq'
     data:         dict
 
-# ── Shared prompt builder ──────────────────────────────────────────────────────
-def build_prompt(resume_text: str, job_description: str) -> str:
+class GithubRepo(BaseModel):
+    name: str
+    description: Optional[str] = None
+    language: Optional[str] = None
+    stars: int = 0
+    repoUrl: Optional[str] = None
+
+class ProfileSyncRequest(BaseModel):
+    github_username: str
+    repos: List[GithubRepo]
+
+class ProfileSyncResponse(BaseModel):
+    success: bool
+    provider: str
+    data: dict # { bio: str, skills: list }
+
+class InterviewQuestion(BaseModel):
+    questionText: str
+    candidateAnswer: Optional[str] = ""
+
+class QuestionRequest(BaseModel):
+    job_title: str
+    job_description: str
+    previous_questions: List[InterviewQuestion] = []
+    question_index: int
+
+class QuestionResponse(BaseModel):
+    success: bool
+    provider: str
+    data: str # the question text itself
+
+class EvaluateRequest(BaseModel):
+    job_title: str
+    job_description: str
+    questions: List[InterviewQuestion]
+
+class EvaluateResponse(BaseModel):
+    success: bool
+    provider: str
+    data: dict # structured evaluation feedback
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def parse_ai_response(raw: str) -> dict:
+    """Strip markdown fences and parse JSON."""
+    clean = re.sub(r"^```json\s*", "", raw.strip(), flags=re.IGNORECASE)
+    clean = re.sub(r"^```\s*",    "", clean,        flags=re.IGNORECASE)
+    clean = re.sub(r"```$",       "", clean.strip(), flags=re.IGNORECASE)
+    return json.loads(clean.strip())
+
+# ── Prompt builders ────────────────────────────────────────────────────────────
+
+def build_ats_prompt(resume_text: str, job_description: str) -> str:
     return f"""
 You are an expert ATS (Applicant Tracking System) resume scanner and professional recruiter.
 
@@ -129,46 +180,116 @@ Scoring rules:
 """.strip()
 
 
-def parse_ai_response(raw: str) -> dict:
-    """Strip markdown fences and parse JSON."""
-    clean = re.sub(r"^```json\s*", "", raw.strip(), flags=re.IGNORECASE)
-    clean = re.sub(r"^```\s*",    "", clean,        flags=re.IGNORECASE)
-    clean = re.sub(r"```$",       "", clean.strip(), flags=re.IGNORECASE)
-    return json.loads(clean.strip())
+def build_profile_prompt(github_username: str, repos: List[GithubRepo]) -> str:
+    repo_summary = ""
+    for r in repos:
+        repo_summary += f"Repo: {r.name}\nDescription: {r.description or 'No description'}\nLanguage: {r.language or 'Unknown'}\nStars: {r.stars}\n\n"
+    
+    return f"""
+You are an expert technical recruiter and developer profiler.
+Analyze the following candidate's GitHub repositories and synthesize a professional profile.
+
+GitHub Username: {github_username}
+
+[GitHub Repositories]
+{repo_summary.strip()}
+
+Provide a comprehensive, high-quality profile summary in JSON format.
+You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do not wrap in markdown blocks like ```json):
+{{
+  "bio": "A 3-4 sentence professional summary of their coding expertise, domain focus, and key strengths based on their repositories.",
+  "skills": ["Skill 1", "Skill 2", "Skill 3"] // Extracted key technical skills, tools, frameworks, and programming languages (max 12).
+}}
+""".strip()
 
 
-# ── Plan A: Gemini 2.0 Flash ───────────────────────────────────────────────────
-async def analyze_with_gemini(resume_text: str, job_description: str) -> dict:
+def build_question_prompt(job_title: str, job_description: str, previous_questions: List[InterviewQuestion], question_index: int) -> str:
+    history_text = ""
+    if previous_questions:
+        for idx, q in enumerate(previous_questions):
+            history_text += f"Q{idx + 1}: {q.questionText}\nCandidate Answer: {q.candidateAnswer or '(Skipped)'}\n\n"
+    else:
+        history_text = "No questions have been asked yet."
+        
+    return f"""
+You are an expert technical interviewer conducting a mock interview for the role: {job_title}.
+
+[Job Description]
+{job_description}
+
+[Interview History]
+{history_text.strip()}
+
+You are currently asking Question #{question_index + 1} of 5.
+Generate the next single technical or behavioral interview question tailored specifically to this job description and the candidate's previous responses (if any).
+Ensure the question is direct, professional, and challenging.
+Ask ONLY the question text. Do not provide any introduction, explanation, or code blocks.
+""".strip()
+
+
+def build_evaluation_prompt(job_title: str, job_description: str, questions: List[InterviewQuestion]) -> str:
+    qa_summary = ""
+    for idx, q in enumerate(questions):
+        qa_summary += f"Q{idx + 1}: {q.questionText}\nCandidate Answer: {q.candidateAnswer or '(No answer provided)'}\n\n"
+        
+    return f"""
+You are an expert technical interviewer and hiring manager.
+Analyze the candidate's answers in this mock interview for the role: {job_title}.
+
+[Job Description]
+{job_description}
+
+[Interview Questions and Candidate Answers]
+{qa_summary.strip()}
+
+Provide a detailed evaluation report of the candidate's performance in JSON format.
+You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do not wrap in markdown blocks like ```json):
+{{
+  "overallScore": 75, // integer percentage from 0 to 100
+  "technicalScore": 70, // integer percentage from 0 to 100
+  "communicationScore": 80, // integer percentage from 0 to 100
+  "feedback": "Overall summary of the candidate's performance, strengths, and areas to improve.",
+  "questionEvaluations": [
+    {{
+      "question": "Question text...",
+      "answer": "Candidate's answer...",
+      "score": 80, // rating from 0 to 100
+      "explanation": "Specific feedback on this answer, what was good, what was missing.",
+      "idealAnswer": "A sample ideal answer showing how the candidate should have answered the question."
+    }}
+  ]
+}}
+""".strip()
+
+
+# ── AI API Core Integrations ─────────────────────────────────────────────────────
+
+async def generate_content_gemini(prompt: str) -> str:
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not configured")
-
     import google.generativeai as genai
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel("gemini-2.0-flash")
+    response = model.generate_content(prompt)
+    return response.text
 
-    response = model.generate_content(build_prompt(resume_text, job_description))
-    return parse_ai_response(response.text)
 
-
-# ── Plan B: Groq Llama-3.3-70B ────────────────────────────────────────────────
-async def analyze_with_groq(resume_text: str, job_description: str) -> dict:
+async def generate_content_groq(prompt: str, max_tokens: int = 1500) -> str:
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY not configured")
-
     from groq import Groq
     client = Groq(api_key=GROQ_API_KEY)
-
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": build_prompt(resume_text, job_description)}],
+        messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=1500,
+        max_tokens=max_tokens,
     )
-    raw = completion.choices[0].message.content or ""
-    return parse_ai_response(raw)
+    return completion.choices[0].message.content or ""
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
+
 @app.get("/", tags=["Health"])
 async def root():
     return {
@@ -189,34 +310,117 @@ async def health():
 
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["ATS"])
 async def analyze_resume(payload: AnalyzeRequest):
-    """
-    Analyze a resume against a job description using AI.
-
-    - **Plan A**: Google Gemini 2.0 Flash
-    - **Plan B**: Groq Llama-3.3-70B (automatic fallback)
-    """
+    """ATS Resume Scorer"""
     # Plan A — Gemini
     try:
-        log.info("[AI] Trying Plan A: Gemini 2.0 Flash...")
-        result = await analyze_with_gemini(payload.resume_text, payload.job_description)
-        log.info("[AI] Plan A (Gemini) succeeded ✅")
-        return AnalyzeResponse(success=True, provider="gemini", data=result)
+        log.info("[AI] ATS Check: Trying Plan A (Gemini)...")
+        raw_res = await generate_content_gemini(build_ats_prompt(payload.resume_text, payload.job_description))
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan A succeeded ✅")
+        return AnalyzeResponse(success=True, provider="gemini", data=parsed)
     except Exception as e:
-        log.warning("[AI] Plan A (Gemini) failed: %s", str(e))
+        log.warning("[AI] Plan A failed: %s", str(e))
 
     # Plan B — Groq
     try:
-        log.info("[AI] Trying Plan B: Groq Llama-3.3-70B...")
-        result = await analyze_with_groq(payload.resume_text, payload.job_description)
-        log.info("[AI] Plan B (Groq) succeeded ✅")
-        return AnalyzeResponse(success=True, provider="groq", data=result)
+        log.info("[AI] ATS Check: Trying Plan B (Groq)...")
+        raw_res = await generate_content_groq(build_ats_prompt(payload.resume_text, payload.job_description))
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan B succeeded ✅")
+        return AnalyzeResponse(success=True, provider="groq", data=parsed)
     except Exception as e:
-        log.error("[AI] Plan B (Groq) failed: %s", str(e))
+        log.error("[AI] Plan B failed: %s", str(e))
 
-    raise HTTPException(
-        status_code=503,
-        detail="Both AI providers failed. Check GEMINI_API_KEY and GROQ_API_KEY in ai-service/.env",
+    raise HTTPException(status_code=503, detail="AI providers exhausted.")
+
+
+@app.post("/profile/github-sync", response_model=ProfileSyncResponse, tags=["Profile"])
+async def sync_profile(payload: ProfileSyncRequest):
+    """GitHub Developer Profile Synthesizer"""
+    prompt = build_profile_prompt(payload.github_username, payload.repos)
+    
+    # Plan A — Gemini
+    try:
+        log.info("[AI] Profile Sync: Trying Plan A (Gemini)...")
+        raw_res = await generate_content_gemini(prompt)
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan A succeeded ✅")
+        return ProfileSyncResponse(success=True, provider="gemini", data=parsed)
+    except Exception as e:
+        log.warning("[AI] Plan A failed: %s", str(e))
+
+    # Plan B — Groq
+    try:
+        log.info("[AI] Profile Sync: Trying Plan B (Groq)...")
+        raw_res = await generate_content_groq(prompt)
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan B succeeded ✅")
+        return ProfileSyncResponse(success=True, provider="groq", data=parsed)
+    except Exception as e:
+        log.error("[AI] Plan B failed: %s", str(e))
+
+    raise HTTPException(status_code=503, detail="AI providers exhausted.")
+
+
+@app.post("/interview/generate-question", response_model=QuestionResponse, tags=["Interview"])
+async def generate_question(payload: QuestionRequest):
+    """sequential Mock Interview Question Generator"""
+    prompt = build_question_prompt(
+        payload.job_title,
+        payload.job_description,
+        payload.previous_questions,
+        payload.question_index
     )
+
+    # Plan A — Gemini
+    try:
+        log.info("[AI] Question Gen: Trying Plan A (Gemini)...")
+        raw_res = await generate_content_gemini(prompt)
+        question = raw_res.strip()
+        log.info("[AI] Plan A succeeded ✅")
+        return QuestionResponse(success=True, provider="gemini", data=question)
+    except Exception as e:
+        log.warning("[AI] Plan A failed: %s", str(e))
+
+    # Plan B — Groq
+    try:
+        log.info("[AI] Question Gen: Trying Plan B (Groq)...")
+        raw_res = await generate_content_groq(prompt, max_tokens=500)
+        question = raw_res.strip()
+        log.info("[AI] Plan B succeeded ✅")
+        return QuestionResponse(success=True, provider="groq", data=question)
+    except Exception as e:
+        log.error("[AI] Plan B failed: %s", str(e))
+
+    raise HTTPException(status_code=503, detail="AI providers exhausted.")
+
+
+@app.post("/interview/evaluate", response_model=EvaluateResponse, tags=["Interview"])
+async def evaluate_interview(payload: EvaluateRequest):
+    """Interview Session Scorer and Feedback Evaluator"""
+    prompt = build_evaluation_prompt(payload.job_title, payload.job_description, payload.questions)
+
+    # Plan A — Gemini
+    try:
+        log.info("[AI] Interview Eval: Trying Plan A (Gemini)...")
+        raw_res = await generate_content_gemini(prompt)
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan A succeeded ✅")
+        return EvaluateResponse(success=True, provider="gemini", data=parsed)
+    except Exception as e:
+        log.warning("[AI] Plan A failed: %s", str(e))
+
+    # Plan B — Groq
+    try:
+        log.info("[AI] Interview Eval: Trying Plan B (Groq)...")
+        raw_res = await generate_content_groq(prompt, max_tokens=2000)
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan B succeeded ✅")
+        return EvaluateResponse(success=True, provider="groq", data=parsed)
+    except Exception as e:
+        log.error("[AI] Plan B failed: %s", str(e))
+
+    raise HTTPException(status_code=503, detail="AI providers exhausted.")
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
