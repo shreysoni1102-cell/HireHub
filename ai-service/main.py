@@ -9,6 +9,7 @@ Responsibilities:
   - Synthesize GitHub developer profile details
   - Generate sequential mock interview questions
   - Evaluate interview session transcripts
+  - Optimize/Enhance resume summary & bullet points
 """
 
 import os
@@ -44,8 +45,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HireHub AI Microservice",
-    description="AI engines powering Resume ATS checks, developer profile syncs, and mock interview preparations",
-    version="1.1.0",
+    description="AI engines powering Resume ATS checks, developer profile syncs, mock interviews, and resume enhancers",
+    version="1.2.0",
     lifespan=lifespan,
 )
 
@@ -107,6 +108,15 @@ class EvaluateResponse(BaseModel):
     success: bool
     provider: str
     data: dict # structured evaluation feedback
+
+class EnhanceRequest(BaseModel):
+    resume_text: str = Field(..., min_length=50)
+    job_description: str = Field(..., min_length=50)
+
+class EnhanceResponse(BaseModel):
+    success: bool
+    provider: str
+    data: dict
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -257,6 +267,38 @@ You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do
       "explanation": "Specific feedback on this answer, what was good, what was missing.",
       "idealAnswer": "A sample ideal answer showing how the candidate should have answered the question."
     }}
+  ]
+}}
+""".strip()
+
+
+def build_enhance_prompt(resume_text: str, job_description: str) -> str:
+    return f"""
+You are an expert ATS (Applicant Tracking System) resume optimizer and professional copywriter.
+Optimize the candidate's Resume Text to align with the target Job Description.
+
+Specifically, generate enhanced versions of:
+1. The Professional Summary section (integrate missing keywords, highlight domain authority).
+2. The Core Experience Bullet Points (rewrite weak points to use strong action verbs and quantified impact).
+
+[Job Description]
+{job_description}
+
+[Candidate's Resume Text]
+{resume_text}
+
+Provide the optimized sections in JSON format.
+You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do not wrap in markdown blocks like ```json):
+{{
+  "originalSummary": "The candidate's original professional summary (or if missing, the top intro text of the resume)...",
+  "enhancedSummary": "The newly optimized, keyword-rich professional summary...",
+  "originalBullets": [
+    "Original experience bullet 1...",
+    "Original experience bullet 2..."
+  ],
+  "enhancedBullets": [
+    "Optimized experience bullet 1 using strong verbs...",
+    "Optimized experience bullet 2 using strong verbs..."
   ]
 }}
 """.strip()
@@ -419,6 +461,34 @@ async def evaluate_interview(payload: EvaluateRequest):
         return EvaluateResponse(success=True, provider="groq", data=parsed)
     except Exception as e:
         log.error("[AI] Plan B failed: %s", str(e))
+
+    raise HTTPException(status_code=503, detail="AI providers exhausted.")
+
+
+@app.post("/profile/enhance", response_model=EnhanceResponse, tags=["Profile"])
+async def enhance_resume(payload: EnhanceRequest):
+    """Resume Enhancer and ATS Optimizer"""
+    prompt = build_enhance_prompt(payload.resume_text, payload.job_description)
+
+    # Plan A — Gemini
+    try:
+        log.info("[AI] Resume Enhance: Trying Plan A (Gemini)...")
+        raw_res = await generate_content_gemini(prompt)
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan A succeeded ✅")
+        return EnhanceResponse(success=True, provider="gemini", data=parsed)
+    except Exception as e:
+        log.warning("[AI] Resume Enhance: Plan A failed: %s", str(e))
+
+    # Plan B — Groq
+    try:
+        log.info("[AI] Resume Enhance: Trying Plan B (Groq)...")
+        raw_res = await generate_content_groq(prompt, max_tokens=2000)
+        parsed = parse_ai_response(raw_res)
+        log.info("[AI] Plan B succeeded ✅")
+        return EnhanceResponse(success=True, provider="groq", data=parsed)
+    except Exception as e:
+        log.error("[AI] Resume Enhance: Plan B failed: %s", str(e))
 
     raise HTTPException(status_code=503, detail="AI providers exhausted.")
 

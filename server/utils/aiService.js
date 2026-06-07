@@ -140,6 +140,38 @@ You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do
 `.trim();
 }
 
+function buildEnhancePrompt(resumeText, jobDescription) {
+  return `
+You are an expert ATS (Applicant Tracking System) resume optimizer and professional copywriter.
+Optimize the candidate's Resume Text to align with the target Job Description.
+
+Specifically, generate enhanced versions of:
+1. The Professional Summary section (integrate missing keywords, highlight domain authority).
+2. The Core Experience Bullet Points (rewrite weak points to use strong action verbs and quantified impact).
+
+[Job Description]
+${jobDescription}
+
+[Candidate's Resume Text]
+${resumeText}
+
+Provide the optimized sections in JSON format.
+You MUST respond ONLY with a raw JSON object matching this structure EXACTLY (do not wrap in markdown blocks like \`\`\`json):
+{
+  "originalSummary": "The candidate's original professional summary (or if missing, the top intro text of the resume)...",
+  "enhancedSummary": "The newly optimized, keyword-rich professional summary...",
+  "originalBullets": [
+    "Original experience bullet 1...",
+    "Original experience bullet 2..."
+  ],
+  "enhancedBullets": [
+    "Optimized experience bullet 1 using strong verbs...",
+    "Optimized experience bullet 2 using strong verbs..."
+  ]
+}
+`.trim();
+}
+
 // ─── Utility Parsers ──────────────────────────────────────────────────────────
 
 function parseAIResponse(rawText) {
@@ -209,6 +241,10 @@ async function evaluateSessionWithMicroservice(jobTitle, jobDescription, questio
   return callMicroservice('/interview/evaluate', payload);
 }
 
+async function enhanceResumeWithMicroservice(resumeText, jobDescription) {
+  return callMicroservice('/profile/enhance', { resume_text: resumeText, job_description: jobDescription });
+}
+
 // ─── Plan A: Google Gemini Direct Fallbacks ──────────────────────────────────────
 
 async function analyzeWithGemini(resumeText, jobDescription) {
@@ -244,6 +280,15 @@ async function evaluateSessionWithGemini(jobTitle, jobDescription, questions) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const result = await model.generateContent(buildEvaluationPrompt(jobTitle, jobDescription, questions));
+  return parseAIResponse(result.response.text());
+}
+
+async function enhanceResumeWithGemini(resumeText, jobDescription) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') throw new Error('GEMINI_API_KEY not configured');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const result = await model.generateContent(buildEnhancePrompt(resumeText, jobDescription));
   return parseAIResponse(result.response.text());
 }
 
@@ -295,6 +340,19 @@ async function evaluateSessionWithGroq(jobTitle, jobDescription, questions) {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: buildEvaluationPrompt(jobTitle, jobDescription, questions) }],
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
+  return parseAIResponse(completion.choices[0]?.message?.content || '');
+}
+
+async function enhanceResumeWithGroq(resumeText, jobDescription) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey === 'your_groq_api_key_here') throw new Error('GROQ_API_KEY not configured');
+  const groq = new Groq({ apiKey });
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: buildEnhancePrompt(resumeText, jobDescription) }],
     temperature: 0.3,
     max_tokens: 2000,
   });
@@ -364,7 +422,6 @@ export async function generateInterviewQuestion(jobTitle, jobDescription, previo
   try {
     console.log('[AI] Trying Plan 0: Python AI Microservice question-gen...');
     const res = await generateQuestionWithMicroservice(jobTitle, jobDescription, previousQuestions, questionIndex);
-    // If microservice returns a structured response, check if it's already a string or holds string data
     return typeof res === 'string' ? res : (res.question || JSON.stringify(res));
   } catch (msErr) {
     console.warn('[AI] Plan 0 question-gen unavailable:', msErr.message);
@@ -410,5 +467,32 @@ export async function evaluateInterviewSession(jobTitle, jobDescription, questio
   } catch (groqErr) {
     console.error('[AI] Plan B interview-eval failed:', groqErr.message);
     throw new Error('All AI providers failed to evaluate interview session.');
+  }
+}
+
+/**
+ * AI Resume Enhancer / Tailor
+ */
+export async function enhanceResumeText(resumeText, jobDescription) {
+  try {
+    console.log('[AI] Trying Plan 0: Python AI Microservice profile-enhance...');
+    return await enhanceResumeWithMicroservice(resumeText, jobDescription);
+  } catch (msErr) {
+    console.warn('[AI] Plan 0 profile-enhance unavailable:', msErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan A: Gemini 2.0 Flash profile-enhance...');
+    return await enhanceResumeWithGemini(resumeText, jobDescription);
+  } catch (geminiErr) {
+    console.warn('[AI] Plan A profile-enhance failed:', geminiErr.message);
+  }
+
+  try {
+    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B profile-enhance...');
+    return await enhanceResumeWithGroq(resumeText, jobDescription);
+  } catch (groqErr) {
+    console.error('[AI] Plan B profile-enhance failed:', groqErr.message);
+    throw new Error('All AI providers failed to enhance resume.');
   }
 }
