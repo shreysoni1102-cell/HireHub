@@ -27,11 +27,17 @@ export default function Navbar() {
 
           {isAuthenticated && user?.role === 'user' && (
             <>
+              <NavLink to="/seeker/profile" className={linkClass}>
+                Profile
+              </NavLink>
               <NavLink to="/seeker/applications" className={linkClass}>
                 My applications
               </NavLink>
               <NavLink to="/ats-checker" className={linkClass}>
                 🤖 ATS Checker
+              </NavLink>
+              <NavLink to="/seeker/interview" className={linkClass}>
+                🎙️ Mock Interview
               </NavLink>
             </>
           )}
