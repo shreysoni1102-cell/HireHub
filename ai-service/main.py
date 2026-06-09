@@ -121,11 +121,40 @@ class EnhanceResponse(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def parse_ai_response(raw: str) -> dict:
-    """Strip markdown fences and parse JSON."""
-    clean = re.sub(r"^```json\s*", "", raw.strip(), flags=re.IGNORECASE)
+    """Strip markdown fences, extract JSON content between first { and last }, and parse JSON."""
+    text = raw.strip()
+    
+    # 1. Try direct parsing
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Try removing markdown fences
+    clean = re.sub(r"^```json\s*", "", text, flags=re.IGNORECASE)
     clean = re.sub(r"^```\s*",    "", clean,        flags=re.IGNORECASE)
     clean = re.sub(r"```$",       "", clean.strip(), flags=re.IGNORECASE)
-    return json.loads(clean.strip())
+    
+    try:
+        return json.loads(clean.strip())
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Fallback: extract the outermost JSON object braces
+    first_brace = text.find('{')
+    last_brace = text.rfind('}')
+    
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        json_candidate = text[first_brace:last_brace + 1]
+        try:
+            return json.loads(json_candidate)
+        except json.JSONDecodeError as err:
+            log.error("Failed to parse JSON even after brace extraction. Raw candidate: %s", json_candidate)
+            raise err
+    else:
+        log.error("No valid JSON object braces found in response: %s", raw)
+        raise ValueError("No valid JSON object found in AI response")
+
 
 # ── Prompt builders ────────────────────────────────────────────────────────────
 
@@ -316,17 +345,22 @@ async def generate_content_gemini(prompt: str) -> str:
     return response.text
 
 
-async def generate_content_groq(prompt: str, max_tokens: int = 1500) -> str:
+async def generate_content_groq(prompt: str, max_tokens: int = 1500, response_format: Optional[dict] = None) -> str:
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY not configured")
     from groq import Groq
     client = Groq(api_key=GROQ_API_KEY)
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=max_tokens,
-    )
+    
+    params = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": max_tokens,
+    }
+    if response_format:
+        params["response_format"] = response_format
+
+    completion = client.chat.completions.create(**params)
     return completion.choices[0].message.content or ""
 
 
@@ -366,7 +400,10 @@ async def analyze_resume(payload: AnalyzeRequest):
     # Plan B — Groq
     try:
         log.info("[AI] ATS Check: Trying Plan B (Groq)...")
-        raw_res = await generate_content_groq(build_ats_prompt(payload.resume_text, payload.job_description))
+        raw_res = await generate_content_groq(
+            build_ats_prompt(payload.resume_text, payload.job_description),
+            response_format={"type": "json_object"}
+        )
         parsed = parse_ai_response(raw_res)
         log.info("[AI] Plan B succeeded ✅")
         return AnalyzeResponse(success=True, provider="groq", data=parsed)
@@ -394,7 +431,7 @@ async def sync_profile(payload: ProfileSyncRequest):
     # Plan B — Groq
     try:
         log.info("[AI] Profile Sync: Trying Plan B (Groq)...")
-        raw_res = await generate_content_groq(prompt)
+        raw_res = await generate_content_groq(prompt, response_format={"type": "json_object"})
         parsed = parse_ai_response(raw_res)
         log.info("[AI] Plan B succeeded ✅")
         return ProfileSyncResponse(success=True, provider="groq", data=parsed)
@@ -455,7 +492,7 @@ async def evaluate_interview(payload: EvaluateRequest):
     # Plan B — Groq
     try:
         log.info("[AI] Interview Eval: Trying Plan B (Groq)...")
-        raw_res = await generate_content_groq(prompt, max_tokens=2000)
+        raw_res = await generate_content_groq(prompt, max_tokens=2000, response_format={"type": "json_object"})
         parsed = parse_ai_response(raw_res)
         log.info("[AI] Plan B succeeded ✅")
         return EvaluateResponse(success=True, provider="groq", data=parsed)
@@ -483,7 +520,7 @@ async def enhance_resume(payload: EnhanceRequest):
     # Plan B — Groq
     try:
         log.info("[AI] Resume Enhance: Trying Plan B (Groq)...")
-        raw_res = await generate_content_groq(prompt, max_tokens=2000)
+        raw_res = await generate_content_groq(prompt, max_tokens=2000, response_format={"type": "json_object"})
         parsed = parse_ai_response(raw_res)
         log.info("[AI] Plan B succeeded ✅")
         return EnhanceResponse(success=True, provider="groq", data=parsed)

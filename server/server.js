@@ -21,15 +21,31 @@ import profileRoutes from './routes/profileRoutes.js';
 import interviewRoutes from './routes/interviewRoutes.js';
 
 const app  = express();
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Dynamic CORS options to support testing on phones (local IP) and sharing (tunnels) in development
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',')
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!process.env.CLIENT_URL || !origin || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.includes('localhost') || origin.endsWith('.ngrok-free.app') || origin.endsWith('.localtunnel.me') || origin.endsWith('.trycloudflare.com')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+};
 
 // ── Socket.io setup ───────────────────────────────────────────────────────────
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    ...corsOptions,
     methods: ['GET', 'POST'],
-    credentials: true,
   },
 });
 
@@ -75,7 +91,7 @@ io.on('connection', (socket) => {
 });
 
 // ── Core middleware ───────────────────────────────────────────────────────────
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(requestLogger);
 

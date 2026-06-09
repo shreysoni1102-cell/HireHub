@@ -301,6 +301,7 @@ async function analyzeWithGroq(resumeText, jobDescription) {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: buildPrompt(resumeText, jobDescription) }],
+    response_format: { type: 'json_object' },
     temperature: 0.3,
     max_tokens: 1500,
   });
@@ -314,6 +315,7 @@ async function generateProfileWithGroq(githubUsername, repos) {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: buildProfilePrompt(githubUsername, repos) }],
+    response_format: { type: 'json_object' },
     temperature: 0.3,
     max_tokens: 1500,
   });
@@ -340,6 +342,7 @@ async function evaluateSessionWithGroq(jobTitle, jobDescription, questions) {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: buildEvaluationPrompt(jobTitle, jobDescription, questions) }],
+    response_format: { type: 'json_object' },
     temperature: 0.3,
     max_tokens: 2000,
   });
@@ -353,6 +356,7 @@ async function enhanceResumeWithGroq(resumeText, jobDescription) {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role: 'user', content: buildEnhancePrompt(resumeText, jobDescription) }],
+    response_format: { type: 'json_object' },
     temperature: 0.3,
     max_tokens: 2000,
   });
@@ -362,137 +366,147 @@ async function enhanceResumeWithGroq(resumeText, jobDescription) {
 // ─── Main Exported Integrations ──────────────────────────────────────────────────
 
 /**
+ * Helper to execute steps in sequence, logging progress and catching/diagnosing internet connection issues
+ */
+async function executeAIChain(steps, defaultErrorMessage) {
+  const errors = [];
+
+  for (const step of steps) {
+    try {
+      console.log(`[AI] Trying ${step.name}...`);
+      return await step.fn();
+    } catch (err) {
+      console.warn(`[AI] ${step.name} failed:`, err.message);
+      errors.push(`${step.name}: ${err.message}`);
+    }
+  }
+
+  // Check if errors are due to network/internet connection issues
+  const networkKeywords = [
+    'fetch failed',
+    'enotfound',
+    'eai_again',
+    'connection error',
+    'econnrefused',
+    'etimedout',
+    'econnreset',
+    'network error',
+    'network'
+  ];
+
+  // We check external cloud providers (Plan A Gemini, Plan B Groq)
+  const cloudSteps = errors.filter(e => e.includes('Gemini') || e.includes('Groq'));
+  if (cloudSteps.length > 0) {
+    const allCloudFailedWithNetwork = cloudSteps.every(e =>
+      networkKeywords.some(kw => e.toLowerCase().includes(kw))
+    );
+    if (allCloudFailedWithNetwork) {
+      throw new Error('No internet connection. Please check your network and try again.');
+    }
+  }
+
+  throw new Error(`${defaultErrorMessage} Details: [ ${errors.join(' ] | [ ')} ]`);
+}
+
+/**
  * AI ATS Resume Analyzer
  */
 export async function analyzeResumeATS(resumeText, jobDescription) {
-  try {
-    console.log('[AI] Trying Plan 0: Python AI Microservice (:5001)...');
-    return await analyzeWithMicroservice(resumeText, jobDescription);
-  } catch (msErr) {
-    console.warn('[AI] Plan 0 unavailable:', msErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan A: Gemini 2.0 Flash (direct)...');
-    return await analyzeWithGemini(resumeText, jobDescription);
-  } catch (geminiErr) {
-    console.warn('[AI] Plan A failed:', geminiErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B (direct)...');
-    return await analyzeWithGroq(resumeText, jobDescription);
-  } catch (groqErr) {
-    console.error('[AI] Plan B failed:', groqErr.message);
-    throw new Error('All AI providers failed. Check keys and connectivity.');
-  }
+  return executeAIChain([
+    {
+      name: 'Plan 0 (Python Service)',
+      fn: () => analyzeWithMicroservice(resumeText, jobDescription)
+    },
+    {
+      name: 'Plan A (Gemini)',
+      fn: () => analyzeWithGemini(resumeText, jobDescription)
+    },
+    {
+      name: 'Plan B (Groq)',
+      fn: () => analyzeWithGroq(resumeText, jobDescription)
+    }
+  ], 'All AI providers failed.');
 }
 
 /**
  * AI GitHub Developer Profile Summarizer
  */
 export async function generateDeveloperProfile(githubUsername, repos) {
-  try {
-    console.log('[AI] Trying Plan 0: Python AI Microservice profile-sync...');
-    return await generateProfileWithMicroservice(githubUsername, repos);
-  } catch (msErr) {
-    console.warn('[AI] Plan 0 profile-sync unavailable:', msErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan A: Gemini 2.0 Flash profile-sync...');
-    return await generateProfileWithGemini(githubUsername, repos);
-  } catch (geminiErr) {
-    console.warn('[AI] Plan A profile-sync failed:', geminiErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B profile-sync...');
-    return await generateProfileWithGroq(githubUsername, repos);
-  } catch (groqErr) {
-    console.error('[AI] Plan B profile-sync failed:', groqErr.message);
-    throw new Error('All AI providers failed to generate profile.');
-  }
+  return executeAIChain([
+    {
+      name: 'Plan 0 (Python Service)',
+      fn: () => generateProfileWithMicroservice(githubUsername, repos)
+    },
+    {
+      name: 'Plan A (Gemini)',
+      fn: () => generateProfileWithGemini(githubUsername, repos)
+    },
+    {
+      name: 'Plan B (Groq)',
+      fn: () => generateProfileWithGroq(githubUsername, repos)
+    }
+  ], 'All AI providers failed to generate profile.');
 }
 
 /**
  * AI Sequential Mock Interview Question Generator
  */
 export async function generateInterviewQuestion(jobTitle, jobDescription, previousQuestions, questionIndex) {
-  try {
-    console.log('[AI] Trying Plan 0: Python AI Microservice question-gen...');
-    const res = await generateQuestionWithMicroservice(jobTitle, jobDescription, previousQuestions, questionIndex);
-    return typeof res === 'string' ? res : (res.question || JSON.stringify(res));
-  } catch (msErr) {
-    console.warn('[AI] Plan 0 question-gen unavailable:', msErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan A: Gemini 2.0 Flash question-gen...');
-    return await generateQuestionWithGemini(jobTitle, jobDescription, previousQuestions, questionIndex);
-  } catch (geminiErr) {
-    console.warn('[AI] Plan A question-gen failed:', geminiErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B question-gen...');
-    return await generateQuestionWithGroq(jobTitle, jobDescription, previousQuestions, questionIndex);
-  } catch (groqErr) {
-    console.error('[AI] Plan B question-gen failed:', groqErr.message);
-    throw new Error('All AI providers failed to generate question.');
-  }
+  return executeAIChain([
+    {
+      name: 'Plan 0 (Python Service)',
+      fn: async () => {
+        const res = await generateQuestionWithMicroservice(jobTitle, jobDescription, previousQuestions, questionIndex);
+        return typeof res === 'string' ? res : (res.question || JSON.stringify(res));
+      }
+    },
+    {
+      name: 'Plan A (Gemini)',
+      fn: () => generateQuestionWithGemini(jobTitle, jobDescription, previousQuestions, questionIndex)
+    },
+    {
+      name: 'Plan B (Groq)',
+      fn: () => generateQuestionWithGroq(jobTitle, jobDescription, previousQuestions, questionIndex)
+    }
+  ], 'All AI providers failed to generate question.');
 }
 
 /**
  * AI Mock Interview Session Scorer and Feedback Generator
  */
 export async function evaluateInterviewSession(jobTitle, jobDescription, questions) {
-  try {
-    console.log('[AI] Trying Plan 0: Python AI Microservice interview-eval...');
-    return await evaluateSessionWithMicroservice(jobTitle, jobDescription, questions);
-  } catch (msErr) {
-    console.warn('[AI] Plan 0 interview-eval unavailable:', msErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan A: Gemini 2.0 Flash interview-eval...');
-    return await evaluateSessionWithGemini(jobTitle, jobDescription, questions);
-  } catch (geminiErr) {
-    console.warn('[AI] Plan A interview-eval failed:', geminiErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B interview-eval...');
-    return await evaluateSessionWithGroq(jobTitle, jobDescription, questions);
-  } catch (groqErr) {
-    console.error('[AI] Plan B interview-eval failed:', groqErr.message);
-    throw new Error('All AI providers failed to evaluate interview session.');
-  }
+  return executeAIChain([
+    {
+      name: 'Plan 0 (Python Service)',
+      fn: () => evaluateSessionWithMicroservice(jobTitle, jobDescription, questions)
+    },
+    {
+      name: 'Plan A (Gemini)',
+      fn: () => evaluateSessionWithGemini(jobTitle, jobDescription, questions)
+    },
+    {
+      name: 'Plan B (Groq)',
+      fn: () => evaluateSessionWithGroq(jobTitle, jobDescription, questions)
+    }
+  ], 'All AI providers failed to evaluate interview session.');
 }
 
 /**
  * AI Resume Enhancer / Tailor
  */
 export async function enhanceResumeText(resumeText, jobDescription) {
-  try {
-    console.log('[AI] Trying Plan 0: Python AI Microservice profile-enhance...');
-    return await enhanceResumeWithMicroservice(resumeText, jobDescription);
-  } catch (msErr) {
-    console.warn('[AI] Plan 0 profile-enhance unavailable:', msErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan A: Gemini 2.0 Flash profile-enhance...');
-    return await enhanceResumeWithGemini(resumeText, jobDescription);
-  } catch (geminiErr) {
-    console.warn('[AI] Plan A profile-enhance failed:', geminiErr.message);
-  }
-
-  try {
-    console.log('[AI] Trying Plan B: Groq Llama-3.3-70B profile-enhance...');
-    return await enhanceResumeWithGroq(resumeText, jobDescription);
-  } catch (groqErr) {
-    console.error('[AI] Plan B profile-enhance failed:', groqErr.message);
-    throw new Error('All AI providers failed to enhance resume.');
-  }
+  return executeAIChain([
+    {
+      name: 'Plan 0 (Python Service)',
+      fn: () => enhanceResumeWithMicroservice(resumeText, jobDescription)
+    },
+    {
+      name: 'Plan A (Gemini)',
+      fn: () => enhanceResumeWithGemini(resumeText, jobDescription)
+    },
+    {
+      name: 'Plan B (Groq)',
+      fn: () => enhanceResumeWithGroq(resumeText, jobDescription)
+    }
+  ], 'All AI providers failed to enhance resume.');
 }

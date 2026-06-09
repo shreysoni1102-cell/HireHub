@@ -94,7 +94,7 @@ uvicorn main:app --reload --port 8000
 - **Protected routes:** ProtectedRoute with optional roles prop
 - **Pages:** Home, Job Detail, Login/Register, Seeker Applications, Seeker Profile, Recruiter Dashboard, Admin Panel, ATS Checker, Chat, Interview Lobby, Interview Session, Interview Report
 
----
+![alt text](image.png)---
 
 ## 4. Environment variables
 

@@ -1,5 +1,7 @@
-// Job Controller — CRUD for job postings (recruiter only)
+// Job Controller - CRUD for job postings (recruiter only)
 import Job from '../models/Job.js';
+import Application from '../models/Application.js';
+import ChatMessage from '../models/ChatMessage.js';
 
 /** Public: list all jobs */
 export async function getJobs(_req, res, next) {
@@ -75,17 +77,30 @@ export async function updateJob(req, res, next) {
 /** Recruiter: delete own job */
 export async function deleteJob(req, res, next) {
   try {
-    const job = await Job.findById(req.params.id);
+    const jobId = req.params.id;
+    const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: 'Job not found' });
     }
     if (job.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'You can only delete your own jobs' });
     }
+
+    // 1. Find all applications for this job
+    const apps = await Application.find({ jobId });
+    const appIds = apps.map(a => a._id.toString());
+
+    // 2. Delete chat messages in rooms of these applications
+    await ChatMessage.deleteMany({ roomId: { $in: appIds } });
+
+    // 3. Delete all applications for this job
+    await Application.deleteMany({ jobId });
+
+    // 4. Delete the job itself
     await job.deleteOne();
+
     res.json({ message: 'Job removed' });
   } catch (err) {
     next(err);
   }
 }
-

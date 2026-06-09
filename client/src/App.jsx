@@ -10,6 +10,7 @@ import RecruiterDashboard from './pages/RecruiterDashboard.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import ATSChecker from './pages/ATSChecker.jsx';
 import Chat from './pages/Chat.jsx';
+import Profile from './pages/Profile.jsx';
 import SeekerProfile from './pages/SeekerProfile.jsx';
 import InterviewLobby from './pages/InterviewLobby.jsx';
 import InterviewSession from './pages/InterviewSession.jsx';
@@ -45,6 +46,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={['user']}>
               <SeekerProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute roles={['user', 'recruiter', 'admin']}>
+              <Profile />
             </ProtectedRoute>
           }
         />

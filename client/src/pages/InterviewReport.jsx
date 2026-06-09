@@ -22,7 +22,7 @@ function ScoreRing({ score, label, color }) {
         <svg className="h-full w-full -rotate-90">
           {/* Background Ring */}
           <circle
-            className={`fill-none ${selectedColor.bg} stroke-slate-100 dark:stroke-slate-800`}
+            className={`fill-none ${selectedColor.bg} stroke-border`}
             strokeWidth={strokeWidth}
             r={radius}
             cx="48"
@@ -40,11 +40,11 @@ function ScoreRing({ score, label, color }) {
             cy="48"
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center font-display text-xl font-bold text-slate-800 dark:text-white">
+        <span className="absolute inset-0 flex items-center justify-center font-display text-xl font-bold text-primary">
           {score}%
         </span>
       </div>
-      <span className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-400">
+      <span className="mt-3 text-sm font-semibold text-muted">
         {label}
       </span>
     </div>
@@ -80,7 +80,7 @@ export default function InterviewReport() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-blue-600" />
       </div>
     );
   }
@@ -89,8 +89,8 @@ export default function InterviewReport() {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <span className="text-5xl">⚠️</span>
-        <h2 className="mt-4 text-lg font-bold text-slate-800 dark:text-white">Report Unreachable</h2>
-        <p className="mt-2 text-sm text-slate-500">{error || 'Session not found.'}</p>
+        <h2 className="mt-4 text-lg font-bold text-primary">Report Unreachable</h2>
+        <p className="mt-2 text-sm text-muted">{error || 'Session not found.'}</p>
         <button
           onClick={() => navigate('/seeker/interview')}
           className="mt-6 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
@@ -109,21 +109,21 @@ export default function InterviewReport() {
       {/* Back link */}
       <button
         onClick={() => navigate('/seeker/interview')}
-        className="mb-6 inline-flex items-center text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400"
+        className="mb-6 inline-flex items-center text-sm font-semibold text-accent hover:underline"
       >
         ← Back to Interview Center
       </button>
 
       {/* Header */}
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6 dark:border-slate-800">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
         <div>
-          <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-2xs font-bold text-green-700 dark:bg-green-900/20 dark:text-green-400 tracking-wide uppercase">
+          <span className="inline-flex items-center rounded-full bg-success-muted px-2.5 py-0.5 text-2xs font-bold text-success tracking-wide uppercase">
             Practice Complete
           </span>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-primary">
             Interview Feedback: {session.jobTitle}
           </h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm text-muted">
             Conducted on {new Date(session.createdAt).toLocaleDateString('en-IN', {
               day: 'numeric',
               month: 'long',
@@ -135,30 +135,30 @@ export default function InterviewReport() {
 
       {/* Score Rings Card */}
       <div className="grid gap-6 md:grid-cols-3 mb-8">
-        <div className="md:col-span-1 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex justify-center">
+        <div className="md:col-span-1 rounded-2xl border border-border bg-surface p-6 shadow-sm flex justify-center">
           <ScoreRing score={evalData.overallScore} label="Overall Score" color="blue" />
         </div>
-        <div className="md:col-span-1 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex justify-center">
+        <div className="md:col-span-1 rounded-2xl border border-border bg-surface p-6 shadow-sm flex justify-center">
           <ScoreRing score={evalData.technicalScore} label="Technical Proficiency" color="green" />
         </div>
-        <div className="md:col-span-1 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex justify-center">
+        <div className="md:col-span-1 rounded-2xl border border-border bg-surface p-6 shadow-sm flex justify-center">
           <ScoreRing score={evalData.communicationScore} label="Communication Quality" color="purple" />
         </div>
       </div>
 
       {/* AI Feedback Summary */}
-      <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+      <div className="mb-8 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="text-base font-bold text-primary uppercase tracking-wide">
           Overall Feedback Summary
         </h3>
-        <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+        <p className="mt-4 text-sm leading-relaxed text-muted">
           {evalData.feedback || 'No summary feedback provided.'}
         </p>
       </div>
 
       {/* Question Breakdown Accordion */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-6 text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="mb-6 text-base font-bold text-primary uppercase tracking-wide">
           Question-by-Question Evaluation
         </h3>
 
@@ -169,16 +169,16 @@ export default function InterviewReport() {
               return (
                 <div
                   key={index}
-                  className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50/30 transition dark:border-slate-800 dark:bg-slate-950/10"
+                  className="overflow-hidden rounded-xl border border-border bg-surface-2 transition"
                 >
                   {/* Header/Trigger */}
                   <button
                     type="button"
                     onClick={() => setExpandedIndex(isExpanded ? -1 : index)}
-                    className="flex w-full items-center justify-between p-4 text-left font-medium text-slate-900 dark:text-white focus:outline-none"
+                    className="flex w-full items-center justify-between p-4 text-left font-medium text-primary focus:outline-none"
                   >
                     <div className="pr-4">
-                      <span className="text-2xs font-bold uppercase tracking-wider text-slate-400">Question #{index + 1}</span>
+                      <span className="text-2xs font-bold uppercase tracking-wider text-muted">Question #{index + 1}</span>
                       <h4 className="mt-1 text-sm font-semibold line-clamp-1">
                         {qEval.question}
                       </h4>
@@ -187,49 +187,49 @@ export default function InterviewReport() {
                     <div className="flex items-center gap-3">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-bold ${
                         qEval.score >= 75
-                          ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400'
+                          ? 'bg-success-muted text-success'
                           : qEval.score >= 50
-                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400'
-                          : 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400'
+                          ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400'
+                          : 'bg-danger-muted text-danger'
                       }`}>
                         {qEval.score}%
                       </span>
-                      <span className="text-slate-400">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="text-muted">{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </button>
 
                   {/* Body Content */}
                   {isExpanded && (
-                    <div className="border-t border-slate-100 p-4 space-y-4 dark:border-slate-800">
+                    <div className="border-t border-border p-4 space-y-4">
                       <div>
-                        <h5 className="text-2xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Question asked</h5>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        <h5 className="text-2xs font-bold uppercase tracking-wider text-muted mb-1.5">Question asked</h5>
+                        <p className="text-sm font-semibold text-primary">
                           {qEval.question}
                         </p>
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
                         {/* Candidate Answer */}
-                        <div className="rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/40">
-                          <span className="text-2xs font-bold uppercase tracking-wider text-slate-400">Your Answer</span>
-                          <p className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-300 italic">
+                        <div className="rounded-xl border border-border bg-surface p-3">
+                          <span className="text-2xs font-bold uppercase tracking-wider text-muted">Your Answer</span>
+                          <p className="mt-2 text-xs leading-relaxed text-primary italic">
                             "{qEval.answer || '(No response recorded)'}"
                           </p>
                         </div>
 
                         {/* Ideal Answer */}
-                        <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-3 dark:border-emerald-950/10 dark:bg-emerald-950/5">
-                          <span className="text-2xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Ideal AI Response</span>
-                          <p className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                        <div className="rounded-xl border border-success/30 bg-success-muted p-3">
+                          <span className="text-2xs font-bold uppercase tracking-wider text-success">Ideal AI Response</span>
+                          <p className="mt-2 text-xs leading-relaxed text-primary">
                             {qEval.idealAnswer || 'No sample answer provided.'}
                           </p>
                         </div>
                       </div>
 
                       {/* Explanation Feedback */}
-                      <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-3 dark:border-blue-950/10 dark:bg-blue-950/5">
-                        <span className="text-2xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">AI Explanation & Critique</span>
-                        <p className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                      <div className="rounded-xl border border-accent/30 bg-accent-muted p-3">
+                        <span className="text-2xs font-bold uppercase tracking-wider text-accent">AI Explanation & Critique</span>
+                        <p className="mt-2 text-xs leading-relaxed text-primary">
                           {qEval.explanation || 'No assessment feedback provided.'}
                         </p>
                       </div>
@@ -240,7 +240,7 @@ export default function InterviewReport() {
             })}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">No question grading details available.</p>
+          <p className="text-sm text-muted">No question grading details available.</p>
         )}
       </div>
     </div>

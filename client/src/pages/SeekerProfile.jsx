@@ -46,7 +46,6 @@ export default function SeekerProfile() {
       if (data && data.success) {
         setProfile(data.data);
         setSuccessMsg('Profile successfully synced with GitHub.');
-        // Clear success message after 4s
         setTimeout(() => setSuccessMsg(''), 4000);
       }
     } catch (err) {
@@ -68,29 +67,33 @@ export default function SeekerProfile() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-p">
           Developer Profile
         </h1>
-        <p className="mt-2 text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-sm text-m">
           Sync your public GitHub projects to build an AI-powered bio and skills highlight sheet.
         </p>
       </div>
 
       {/* Sync Form */}
-      <div className="mb-8 rounded-2xl border border-slate-200/80 bg-white/70 p-6 shadow-sm backdrop-blur transition-colors dark:border-slate-800/80 dark:bg-slate-900/70">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-white">GitHub Integration</h2>
-        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+      <div 
+        className="mb-8 rounded-2xl border p-6 shadow-sm transition-colors"
+        style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+      >
+        <h2 className="text-lg font-semibold text-p">GitHub Integration</h2>
+        <p className="mb-4 text-xs text-m mt-1">
           Enter your username to pull your top repositories and trigger AI profile categorization.
         </p>
         <form onSubmit={handleSync} className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-grow">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">@</span>
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-m">@</span>
             <input
               type="text"
               value={usernameInput}
               onChange={(e) => setUsernameInput(e.target.value)}
               placeholder="e.g. octocat"
-              className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-8 pr-4 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+              className="w-full rounded-xl border bg-transparent py-2.5 pl-8 pr-4 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}
               disabled={syncing}
             />
           </div>
@@ -114,12 +117,12 @@ export default function SeekerProfile() {
         </form>
 
         {error && (
-          <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/20 dark:text-red-400">
+          <div className="mt-4 rounded-xl bg-red-50 dark:bg-red-950/20 p-3.5 text-xs text-red-700 dark:text-red-400 border border-red-200/40">
             ⚠️ {error}
           </div>
         )}
         {successMsg && (
-          <div className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950/20 dark:text-green-400">
+          <div className="mt-4 rounded-xl bg-green-50 dark:bg-green-950/20 p-3.5 text-xs text-green-700 dark:text-green-400 border border-green-200/40">
             ✅ {successMsg}
           </div>
         )}
@@ -127,21 +130,29 @@ export default function SeekerProfile() {
 
       {profile ? (
         <div className="grid gap-8 md:grid-cols-3">
-          {/* Left Column: Bio & Skills */}
-          <div className="space-y-8 md:col-span-1">
-            {/* Bio Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+          {/* Top Row: AI Summary (full width) */}
+          <div className="md:col-span-3">
+            <div 
+              className="rounded-2xl border p-6 shadow-sm transition-colors"
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+            >
+              <h3 className="text-sm font-bold uppercase tracking-wide text-p">
                 AI Summary
               </h3>
-              <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              <p className="mt-4 text-xs leading-relaxed text-m">
                 {profile.bio || 'Sync your GitHub profile to generate an AI bio.'}
               </p>
             </div>
+          </div>
 
+          {/* Left Column: Skills & Stats */}
+          <div className="space-y-8 md:col-span-1">
             {/* Skills Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+            <div 
+              className="rounded-2xl border p-6 shadow-sm transition-colors"
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+            >
+              <h3 className="text-sm font-bold uppercase tracking-wide text-p">
                 Skills Highlight
               </h3>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -165,14 +176,17 @@ export default function SeekerProfile() {
                     );
                   })
                 ) : (
-                  <p className="text-sm text-slate-400">No skills identified yet.</p>
+                  <p className="text-xs text-m">No skills identified yet.</p>
                 )}
               </div>
             </div>
 
             {/* Meta Stats */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-900/50">
-              <p className="text-xs text-slate-500">
+            <div 
+              className="rounded-2xl border p-6 transition-colors text-xs text-m"
+              style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border)' }}
+            >
+              <p>
                 Last Synced: {new Date(profile.lastSynced).toLocaleString('en-IN')}
               </p>
             </div>
@@ -180,8 +194,11 @@ export default function SeekerProfile() {
 
           {/* Right Column: Synced Repositories */}
           <div className="space-y-6 md:col-span-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-4 text-base font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+            <div 
+              className="rounded-2xl border p-6 shadow-sm transition-colors"
+              style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+            >
+              <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-p">
                 Highlighted Repositories
               </h3>
 
@@ -190,24 +207,25 @@ export default function SeekerProfile() {
                   {profile.repositories.map((repo, idx) => (
                     <div
                       key={idx}
-                      className="group flex flex-col justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-4 transition duration-200 hover:-translate-y-1 hover:border-slate-200 hover:bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-950/20 dark:hover:border-slate-700 dark:hover:bg-slate-950/50"
+                      className="group flex flex-col justify-between rounded-xl border p-4 transition duration-200 hover:-translate-y-1 hover:shadow-md"
+                      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
                     >
                       <div>
                         <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-slate-950 group-hover:text-blue-600 dark:text-white">
+                          <h4 className="font-semibold text-xs group-hover:text-blue-600 truncate max-w-[150px]" style={{ color: 'var(--text-primary)' }}>
                             {repo.name}
                           </h4>
                           <span className="flex items-center text-xs font-medium text-amber-500">
-                            ★ <span className="ml-1 text-slate-600 dark:text-slate-300">{repo.stars}</span>
+                            ★ <span className="ml-1" style={{ color: 'var(--text-primary)' }}>{repo.stars}</span>
                           </span>
                         </div>
-                        <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-3">
+                        <p className="mt-2 text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
                           {repo.description || 'No description provided.'}
                         </p>
                       </div>
 
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-3xs font-semibold border" style={{ backgroundColor: 'var(--bg-surface-2)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                           {repo.language}
                         </span>
                         <a
@@ -223,17 +241,20 @@ export default function SeekerProfile() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">No repositories synced.</p>
+                <p className="text-xs text-m">No repositories synced.</p>
               )}
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-16 text-center dark:border-slate-800">
+        <div 
+          className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center"
+          style={{ borderColor: 'var(--border)' }}
+        >
           <span className="text-5xl">🐙</span>
-          <h3 className="mt-4 text-base font-semibold text-slate-800 dark:text-white">No GitHub Profile Synced</h3>
-          <p className="mt-2 text-sm text-slate-500">
-            Connect your GitHub account above to automatically showcase your repositories and projects.
+          <h3 className="mt-4 text-base font-semibold text-p">No GitHub Profile Synced</h3>
+          <p className="mt-2 text-xs text-m max-w-sm mx-auto">
+            Connect your public GitHub account above to automatically showcase your repositories and projects.
           </p>
         </div>
       )}

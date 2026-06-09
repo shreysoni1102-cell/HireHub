@@ -1,70 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Variables — Light Mode (default) ── */
+:root {
+  --bg-page:       #ede8d9;  /* Deeper soft warm sand background */
+  --bg-surface:    #f9f7f0;  /* Rich warm cream surface */
+  --bg-surface-2:  #e2dccb;  /* Distinct soft beige for panels/headers */
+  --bg-surface-3:  #d8d1be;  /* Warm control surface */
+  --border:        #d2c7b4;  /* Soft organic border */
+  --border-2:      #c3b6a0;  /* Secondary organic border */
+  --text-primary:  #2c2820;  /* Warm espresso/charcoal text */
+  --text-muted:    #6b6251;  /* Soft brown-slate text */
+  --text-faint:    #9b8f7c;  /* Faint earth-tone text */
+  --accent:        #1d4ed8;  /* Royal brand blue for good readability */
+  --accent-hover:  #1e40af;
+  --accent-muted:  #f3ebd7;  /* Warm soft blue-tint accent backdrop */
+  --accent-text:   #1d4ed8;
+  --success:       #16a34a;
+  --success-muted: #f0fdf4;
+  --danger:        #dc2626;
+  --danger-muted:  #fef2f2;
+  --warning:       #d97706;
+  --navbar-bg:     #f9f7f0;  /* matches var(--bg-surface) */
+  --navbar-border: #d2c7b4;  /* matches var(--border) */
+  --navbar-text:   #6b6251;  /* matches var(--text-muted) */
+  --navbar-active: #1d4ed8;  /* matches var(--accent) */
+}
+
+/* ── CSS Variables — Dark Mode ── */
+.dark {
+  --bg-page:       #0d1117;
+  --bg-surface:    #161b22;
+  --bg-surface-2:  #1c2128;
+  --bg-surface-3:  #21262d;
+  --border:        #30363d;
+  --border-2:      #21262d;
+  --text-primary:  #e6edf3;
+  --text-muted:    #8b949e;
+  --text-faint:    #484f58;
+  --accent:        #58a6ff;
+  --accent-hover:  #79c0ff;
+  --accent-muted:  #1f3a5c;
+  --accent-text:   #58a6ff;
+  --success:       #3fb950;
+  --success-muted: #1a3a28;
+  --danger:        #f85149;
+  --danger-muted:  #3a1f1f;
+  --warning:       #e3b341;
+  --navbar-bg:     #161b22;
+  --navbar-border: #30363d;
+  --navbar-text:   #8b949e;
+  --navbar-active: #58a6ff;
+}
+
+/* ── Base ── */
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  font-family: 'Inter', sans-serif;
 }
 
-/* ── GLOBAL AUTOMATIC DARK MODE OVERRIDES ── */
-.dark body {
-  background-color: #020617 !important; /* slate-950 */
-  color: #f1f5f9 !important; /* slate-100 */
+* {
+  box-sizing: border-box;
 }
 
-/* Cards & Containers */
-.dark .bg-white {
-  background-color: #0f172a !important; /* slate-900 */
-}
-.dark .bg-slate-50 {
-  background-color: #020617 !important; /* slate-950 */
-}
-.dark .bg-slate-100 {
-  background-color: #1e293b !important; /* slate-800 */
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Text Colors */
-.dark .text-slate-900 {
-  color: #f8fafc !important; /* slate-50 */
-}
-.dark .text-slate-800 {
-  color: #f1f5f9 !important; /* slate-100 */
-}
-.dark .text-slate-700 {
-  color: #e2e8f0 !important; /* slate-200 */
-}
-.dark .text-slate-600 {
-  color: #cbd5e1 !important; /* slate-300 */
-}
-.dark .text-slate-500 {
-  color: #94a3b8 !important; /* slate-400 */
-}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-/* Borders */
-.dark .border-slate-200 {
-  border-color: #1e293b !important; /* slate-800 */
-}
-.dark .border-slate-100 {
-  border-color: #0f172a !important; /* slate-900 */
-}
+/* ── Focus ring ── */
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Forms, Inputs, Textareas, Selects */
-.dark input, 
-.dark textarea, 
-.dark select {
-  background-color: #0f172a !important;
-  color: #f8fafc !important;
-  border-color: #334155 !important;
-}
-.dark input::placeholder, 
-.dark textarea::placeholder {
-  color: #64748b !important;
-}
-
-/* Interactive & Hover states */
-.dark .hover\:bg-slate-50:hover {
-  background-color: #1e293b !important;
-}
-.dark .hover\:bg-slate-100:hover {
-  background-color: #1e293b !important;
-}
+/* ── Utility classes using CSS vars ── */
+.surface       { background-color: var(--bg-surface); border-color: var(--border); }
+.surface-2     { background-color: var(--bg-surface-2); }
+.text-p        { color: var(--text-primary); }
+.text-m        { color: var(--text-muted); }
+.accent-color  { color: var(--accent); }

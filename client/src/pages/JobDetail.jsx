@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../api/axios.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -53,84 +53,148 @@ export default function JobDetail() {
     }
   };
 
-  if (loading) return <p className="text-slate-500">Loading job…</p>;
-  if (error || !job) return <p className="text-red-600">{error || 'Not found'}</p>;
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-20">
+        <div className="w-12 h-12 rounded-full border-4 border-blue-600/30 border-t-blue-600 animate-spin mb-4" />
+        <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Loading job details...</p>
+      </div>
+    );
+  }
+
+  if (error || !job) {
+    return (
+      <div className="flex-1 w-full max-w-4xl mx-auto px-4 py-8 md:px-8 text-center">
+        <div className="mb-4 text-4xl">⚠️</div>
+        <p className="text-lg font-bold" style={{ color: 'var(--danger)' }}>{error || 'Job not found'}</p>
+        <Link to="/" className="mt-4 inline-block text-sm font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
+          Back to listings
+        </Link>
+      </div>
+    );
+  }
 
   const canApply = isAuthenticated && user?.role === 'user';
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <p className="text-sm font-medium text-brand-700">{job.company}</p>
-      <h1 className="font-display mt-1 text-3xl font-bold text-slate-900">{job.title}</h1>
-      <p className="mt-2 text-slate-600">
-        {job.location} · <span className="text-emerald-700">{job.salary}</span>
-      </p>
-      {job.createdBy && (
-        <p className="mt-4 text-sm text-slate-500">
-          Posted by {job.createdBy.name || job.createdBy.email}
+    <div className="flex-1 w-full max-w-4xl mx-auto px-4 py-8 md:px-8">
+      <Link 
+        to="/" 
+        className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline mb-6 transition-colors"
+        style={{ color: 'var(--accent)' }}
+      >
+        ← Back to all jobs
+      </Link>
+
+      {/* Main card */}
+      <article 
+        className="rounded-2xl border p-6 shadow-md sm:p-8 transition-colors duration-200"
+        style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+      >
+        {/* Company header */}
+        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {job.company}
         </p>
-      )}
-      <div className="prose prose-slate mt-8 max-w-none">
-        <h2 className="text-lg font-semibold text-slate-900">Description</h2>
-        <p className="whitespace-pre-wrap text-slate-700">{job.description}</p>
-      </div>
+        
+        {/* Job Title */}
+        <h1 className="font-display mt-1.5 text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+          {job.title}
+        </h1>
+        
+        {/* Metadata: Location & Salary */}
+        <p className="mt-2.5 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+          📍 {job.location || 'Remote'} 
+          {job.salary && (
+            <>
+              {'   '}
+              <span className="font-semibold" style={{ color: 'var(--success)' }}>
+                💰 {job.salary}
+              </span>
+            </>
+          )}
+        </p>
 
-      <div className="mt-10 border-t border-slate-100 pt-8">
-        <h2 className="font-display text-lg font-semibold text-slate-900">Apply</h2>
-        {!isAuthenticated && (
-          <p className="mt-2 text-sm text-slate-600">
-            <Link to="/login" className="font-medium text-brand-700 hover:underline">
-              Log in
-            </Link>{' '}
-            as a job seeker to apply.
+        {job.createdBy && (
+          <p className="mt-4 text-xs" style={{ color: 'var(--text-faint)' }}>
+            Posted by {job.createdBy.name || job.createdBy.email}
           </p>
         )}
-        {isAuthenticated && user?.role !== 'user' && (
-          <p className="mt-2 text-sm text-amber-800">
-            Recruiter and admin accounts cannot apply. Use a job seeker account to submit an
-            application.
+
+        {/* Job Description */}
+        <div className="mt-8 border-t pt-8" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Description</h2>
+          <p className="whitespace-pre-wrap text-sm mt-3 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            {job.description}
           </p>
-        )}
-        {canApply && (
-          <form onSubmit={handleApply} className="mt-4 max-w-lg space-y-3">
-            {applyMsg && (
-              <p
-                className={`rounded-lg px-3 py-2 text-sm ${
-                  applyMsg.includes('success')
-                    ? 'bg-emerald-50 text-emerald-800'
-                    : 'bg-amber-50 text-amber-900'
-                }`}
+        </div>
+
+        {/* Application Section */}
+        <div className="mt-10 border-t pt-8" style={{ borderColor: 'var(--border)' }}>
+          <h2 className="font-display text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+            Apply to Position
+          </h2>
+          
+          {!isAuthenticated && (
+            <p className="mt-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+              Please{' '}
+              <Link to="/login" className="font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
+                log in
+              </Link>{' '}
+              as a job seeker to submit your application.
+            </p>
+          )}
+
+          {isAuthenticated && user?.role !== 'user' && (
+            <div className="mt-3 p-3 rounded-lg border border-orange-500/20 bg-orange-500/10 text-xs text-orange-400">
+              ⚠️ Recruiter and admin accounts cannot apply to jobs. Please sign in with a Job Seeker account.
+            </div>
+          )}
+
+          {canApply && (
+            <form onSubmit={handleApply} className="mt-4 max-w-lg space-y-4">
+              {applyMsg && (
+                <div 
+                  className={`rounded-lg px-4 py-3 text-sm border ${
+                    applyMsg.includes('success')
+                      ? 'bg-green-50 text-green-800 border-green-500/20 dark:bg-green-900/10 dark:text-green-400'
+                      : 'bg-orange-50 text-orange-900 border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-400'
+                  }`}
+                >
+                  {applyMsg}
+                </div>
+              )}
+              
+              <div className="space-y-1.5">
+                <label htmlFor="resume" className="block text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Resume link (URL)
+                </label>
+                <input
+                  id="resume"
+                  type="url"
+                  value={resumeLink}
+                  onChange={(e) => setResumeLink(e.target.value)}
+                  placeholder="e.g. Google Drive link or Portfolio URL"
+                  className="w-full rounded-lg px-4 py-2.5 text-sm border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-page)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-primary)',
+                  }}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={applying}
+                className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60 transition-colors"
               >
-                {applyMsg}
-              </p>
-            )}
-            <label htmlFor="resume" className="block text-sm font-medium text-slate-700">
-              Resume link (URL)
-            </label>
-            <input
-              id="resume"
-              type="url"
-              value={resumeLink}
-              onChange={(e) => setResumeLink(e.target.value)}
-              placeholder="https://…"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-            <button
-              type="submit"
-              disabled={applying}
-              className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-            >
-              {applying ? 'Submitting…' : 'Submit application'}
-            </button>
-          </form>
-        )}
-      </div>
-
-      <p className="mt-8">
-        <Link to="/" className="text-sm font-medium text-brand-700 hover:underline">
-          ← Back to all jobs
-        </Link>
-      </p>
-    </article>
+                {applying ? 'Submitting...' : 'Submit Application'}
+              </button>
+            </form>
+          )}
+        </div>
+      </article>
+    </div>
   );
 }

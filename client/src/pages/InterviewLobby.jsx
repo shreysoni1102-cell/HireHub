@@ -74,10 +74,10 @@ export default function InterviewLobby() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-primary">
           AI Interview Coach
         </h1>
-        <p className="mt-2 text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-muted">
           Practice interactive mock interviews tailored to any job role, dictate answers with your voice, and receive professional rubric grading.
         </p>
       </div>
@@ -85,17 +85,17 @@ export default function InterviewLobby() {
       <div className="grid gap-8 md:grid-cols-3">
         {/* Left Column: Start Interview Form */}
         <div className="md:col-span-1">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-primary uppercase tracking-wide">
               Start Practice Session
             </h2>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-xs text-muted">
               Input the job profile details below. The AI interviewer will generate 5 custom questions based on this.
             </p>
 
             <form onSubmit={handleStart} className="mt-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
                   Target Job Title
                 </label>
                 <input
@@ -104,12 +104,12 @@ export default function InterviewLobby() {
                   onChange={(e) => setJobTitle(e.target.value)}
                   placeholder="e.g. React Developer"
                   required
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                  className="mt-1.5 w-full rounded-xl border border-border bg-transparent px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
                   Job Description / Skills
                 </label>
                 <textarea
@@ -118,7 +118,7 @@ export default function InterviewLobby() {
                   placeholder="Requirements, tech stack, and key responsibilities..."
                   rows={6}
                   required
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                  className="mt-1.5 w-full rounded-xl border border-border bg-transparent px-3 py-2 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-primary"
                 />
               </div>
 
@@ -151,23 +151,23 @@ export default function InterviewLobby() {
 
         {/* Right Column: History List */}
         <div className="md:col-span-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white uppercase tracking-wide">
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-primary uppercase tracking-wide">
               Practice History
             </h2>
 
             {history.length > 0 ? (
-              <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="mt-4 divide-y divide-border">
                 {history.map((session) => (
                   <div
                     key={session._id}
                     className="flex flex-wrap items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"
                   >
                     <div>
-                      <h4 className="font-semibold text-slate-900 dark:text-white">
+                      <h4 className="font-semibold text-primary">
                         {session.jobTitle}
                       </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-muted">
                         {new Date(session.createdAt).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -180,7 +180,7 @@ export default function InterviewLobby() {
                       {session.status === 'completed' ? (
                         <>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Score:</span>
+                            <span className="text-xs font-semibold text-muted">Score:</span>
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
                               session.evaluation?.overallScore >= 75
                                 ? 'bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400'
@@ -193,7 +193,7 @@ export default function InterviewLobby() {
                           </div>
                           <button
                             onClick={() => navigate(`/seeker/interview/${session._id}/report`)}
-                            className="rounded-xl border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                            className="rounded-xl border border-border px-3.5 py-1.5 text-xs font-semibold text-primary hover:bg-surface-2"
                           >
                             View Report
                           </button>
@@ -218,10 +218,10 @@ export default function InterviewLobby() {
             ) : (
               <div className="mt-8 flex flex-col items-center justify-center text-center">
                 <span className="text-4xl">🎙️</span>
-                <p className="mt-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <p className="mt-4 text-sm font-semibold text-primary">
                   No practice sessions yet
                 </p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-muted">
                   Create a session on the left to start practicing.
                 </p>
               </div>

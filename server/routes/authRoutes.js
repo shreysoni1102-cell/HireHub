@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { register, login } from '../controllers/authController.js';
+import { register, login, verify, resendVerificationCode, forgotPassword, verifyResetCode, resetPassword, deleteAccount } from '../controllers/authController.js';
+import { protect } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -69,5 +70,13 @@ router.post('/register', register);
  *         description: Too many login attempts. Rate limited for 15 minutes.
  */
 router.post('/login', login);
+
+
+router.post('/verify', verify);
+router.post('/resend-code', resendVerificationCode);
+router.post('/forgot-password', forgotPassword);
+router.post('/verify-reset-code', verifyResetCode);
+router.post('/reset-password', resetPassword);
+router.delete('/delete-account', protect, deleteAccount);
 
 export default router;
