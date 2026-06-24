@@ -14,7 +14,11 @@ export async function connectDB() {
   if (process.env.NODE_ENV === 'test') {
     const { MongoMemoryServer } = await import('mongodb-memory-server');
     if (!mongoServer) {
-      mongoServer = await MongoMemoryServer.create();
+      mongoServer = await MongoMemoryServer.create({
+        binary: {
+          version: '6.0.14',
+        },
+      });
     }
     const uri = mongoServer.getUri();
     try {

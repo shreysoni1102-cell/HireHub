@@ -21,6 +21,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
 
+      - name: Cache MongoDB Binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-6.0.14
+
       - name: Install Dependencies
         run: |
           cd server
@@ -30,6 +36,10 @@ jobs:
         run: |
           cd server
           npm test
+        env:
+          JWT_SECRET: test_secret_key_for_ci_only_do_not_use_in_prod
+          JWT_EXPIRES_IN: 7d
+          NODE_ENV: test
 
   client-ci:
     name: Client CI
