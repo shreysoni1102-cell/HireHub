@@ -121,7 +121,11 @@ app.use(errorHandler);
 // ── Start ─────────────────────────────────────────────────────────────────────
 await connectDB();
 
-httpServer.listen(PORT, () => {
-  console.log(`HireHub API listening on port ${PORT}`);
-  console.log(`Socket.io real-time chat: ENABLED`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  httpServer.listen(PORT, () => {
+    console.log(`HireHub API listening on port ${PORT}`);
+    console.log(`Socket.io real-time chat: ENABLED`);
+  });
+}
+
+export { app, httpServer };
