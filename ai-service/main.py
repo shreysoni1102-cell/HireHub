@@ -24,6 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
+from services.ats_scoring import score_ats_resume
+
 # ── Load environment variables ─────────────────────────────────────────────────
 load_dotenv()
 
@@ -158,64 +160,40 @@ def parse_ai_response(raw: str) -> dict:
 
 # ── Prompt builders ────────────────────────────────────────────────────────────
 
-def build_ats_prompt(resume_text: str, job_description: str) -> str:
+def build_ats_qualitative_prompt(resume_text: str, job_description: str, scores: dict) -> str:
     return f"""
 You are an expert ATS (Applicant Tracking System) resume scanner and professional recruiter.
+Provide qualitative feedback and recommendations for a candidate applying to a role based on their resume and the job description.
 
-You have been given TWO separate inputs:
-1. RESUME TEXT — extracted from the candidate's uploaded PDF resume
-2. JOB DESCRIPTION — the job the candidate is applying for
+We have already computed the deterministic ATS match scores and metrics for this candidate:
+- Overall ATS Score: {scores['ats_score']}/100 (Grade: {scores['grade']})
+- Keyword Analysis Score: {scores['keyword_analysis']['score']}/40
+- Section Completeness Score: {scores['section_completeness']['score']}/20
+- Formatting Safety Score: {scores['formatting_safety']['score']}/15
+- Quantified Achievements Score: {scores['quantified_achievements']['score']}/15
+- Action Verbs Score: {scores['action_verbs']['score']}/10
 
-Analyze the RESUME TEXT against the JOB DESCRIPTION and return a detailed ATS report.
-
-[RESUME TEXT — from uploaded PDF]
+[RESUME TEXT]
 {resume_text}
 
-[JOB DESCRIPTION — target role]
+[JOB DESCRIPTION]
 {job_description}
 
+Based on the resume and the scores above, generate the qualitative feedback. Keep your narrative highly aligned with the numerical scores. Do not invent different scores.
 Return ONLY raw JSON — no markdown, no code fences, no explanation. Use exactly this structure:
 
 {{
-  "ats_score": <number 0-100>,
-  "grade": "<A/B/C/D/F>",
-  "summary": "<2-3 sentence overall verdict>",
-  "keyword_analysis": {{
-    "score": <0-40>,
-    "matched_keywords": ["keyword1", "keyword2"],
-    "missing_keywords": ["keyword3", "keyword4"],
-    "notes": "<short observation>"
-  }},
-  "section_completeness": {{
-    "score": <0-20>,
-    "sections_found": ["Experience", "Education"],
-    "sections_missing": ["Summary", "Skills"],
-    "notes": "<observation>"
-  }},
-  "formatting_safety": {{
-    "score": <0-15>,
-    "issues_detected": [],
-    "notes": "<observation>"
-  }},
-  "quantified_achievements": {{
-    "score": <0-15>,
-    "examples_found": ["Increased X by Y%"],
-    "suggestions": ["Quantify your impact"],
-    "notes": "<observation>"
-  }},
-  "action_verbs": {{
-    "score": <0-10>,
-    "strong_verbs_found": ["Led", "Built"],
-    "weak_phrases": ["Responsible for"],
-    "notes": "<observation>"
-  }},
-  "top_improvements": ["Improvement 1", "Improvement 2", "Improvement 3"]
+  "summary": "<A professional 2-3 sentence overall verdict explaining why the candidate received the score {scores['ats_score']}/100. Reference specific skills and matches/gaps.>",
+  "top_improvements": [
+    "<High-priority suggestion 1>",
+    "<High-priority suggestion 2>",
+    "<High-priority suggestion 3>"
+  ],
+  "strong_verbs_found": ["<Strong action verb 1>", "<Strong action verb 2>"],
+  "weak_phrases": ["<Weak phrase/verb 1>", "<Weak phrase/verb 2>"],
+  "quantified_achievements_notes": "<Specific feedback on what achievements they quantified, or how they can better quantify their impact.>",
+  "action_verbs_notes": "<A short observation on their action verb usage.>"
 }}
-
-Scoring rules:
-- ats_score = sum of all 5 category scores
-- grade: 85-100=A, 70-84=B, 55-69=C, 40-54=D, below 40=F
-- Be specific and reference actual resume/JD content
 """.strip()
 
 
@@ -386,31 +364,98 @@ async def health():
 
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["ATS"])
 async def analyze_resume(payload: AnalyzeRequest):
-    """ATS Resume Scorer"""
-    # Plan A — Gemini
+    """ATS Resume Scorer (Hybrid NLP + LLM)"""
     try:
-        log.info("[AI] ATS Check: Trying Plan A (Gemini)...")
-        raw_res = await generate_content_gemini(build_ats_prompt(payload.resume_text, payload.job_description))
-        parsed = parse_ai_response(raw_res)
-        log.info("[AI] Plan A succeeded ✅")
-        return AnalyzeResponse(success=True, provider="gemini", data=parsed)
-    except Exception as e:
-        log.warning("[AI] Plan A failed: %s", str(e))
+        log.info("[AI] ATS Check: Running deterministic NLP scoring...")
+        # 1. Run deterministic scoring
+        scores = score_ats_resume(payload.resume_text, payload.job_description)
+        
+        # 2. Call the LLM (Gemini or Groq fallback) for qualitative feedback
+        prompt = build_ats_qualitative_prompt(payload.resume_text, payload.job_description, scores)
+        
+        qualitative = None
+        provider = None
+        
+        # Plan A — Gemini
+        try:
+            log.info("[AI] Qualitative feedback: Trying Plan A (Gemini)...")
+            raw_res = await generate_content_gemini(prompt)
+            qualitative = parse_ai_response(raw_res)
+            provider = "gemini"
+            log.info("[AI] Plan A succeeded ✅")
+        except Exception as e:
+            log.warning("[AI] Plan A failed: %s", str(e))
+            
+        # Plan B — Groq
+        if not qualitative:
+            try:
+                log.info("[AI] Qualitative feedback: Trying Plan B (Groq)...")
+                raw_res = await generate_content_groq(prompt, response_format={"type": "json_object"})
+                qualitative = parse_ai_response(raw_res)
+                provider = "groq"
+                log.info("[AI] Plan B succeeded ✅")
+            except Exception as e:
+                log.error("[AI] Plan B failed: %s", str(e))
+                
+        if not qualitative:
+            # If all LLMs fail, build a basic qualitative report to ensure the service never goes down
+            log.warning("[AI] LLM providers exhausted. Returning deterministic scores with placeholder feedback.")
+            qualitative = {
+                "summary": f"Based on programmatic analysis, your resume has a {scores['ats_score']}% match with the job description.",
+                "top_improvements": [
+                    f"Work on adding more keywords related to: {', '.join(scores['keyword_analysis']['missing_keywords'][:3])}" if scores['keyword_analysis']['missing_keywords'] else "Refine your resume formatting.",
+                    "Ensure all standard sections (Experience, Education, Skills, Summary) are clearly labeled.",
+                    "Include more quantified achievements showing business impact (e.g. increase revenue, speed improvements)."
+                ],
+                "strong_verbs_found": scores['action_verbs']['strong_verbs_found'] or ["Led", "Built", "Managed"],
+                "weak_phrases": scores['action_verbs']['weak_phrases'] or ["Responsible for"],
+                "quantified_achievements_notes": "Programmatic check done. Add more numbers or percentages.",
+                "action_verbs_notes": "Use strong action verbs to start your bullet points."
+            }
+            provider = "none"
 
-    # Plan B — Groq
-    try:
-        log.info("[AI] ATS Check: Trying Plan B (Groq)...")
-        raw_res = await generate_content_groq(
-            build_ats_prompt(payload.resume_text, payload.job_description),
-            response_format={"type": "json_object"}
-        )
-        parsed = parse_ai_response(raw_res)
-        log.info("[AI] Plan B succeeded ✅")
-        return AnalyzeResponse(success=True, provider="groq", data=parsed)
-    except Exception as e:
-        log.error("[AI] Plan B failed: %s", str(e))
+        # 3. Merge deterministic scores and LLM qualitative feedback
+        merged_data = {
+            "ats_score": scores["ats_score"],
+            "grade": scores["grade"],
+            "summary": qualitative.get("summary", ""),
+            "keyword_analysis": {
+                "score": scores["keyword_analysis"]["score"],
+                "matched_keywords": scores["keyword_analysis"]["matched_keywords"],
+                "missing_keywords": scores["keyword_analysis"]["missing_keywords"],
+                "notes": scores["keyword_analysis"]["notes"]
+            },
+            "section_completeness": {
+                "score": scores["section_completeness"]["score"],
+                "sections_found": scores["section_completeness"]["sections_found"],
+                "sections_missing": scores["section_completeness"]["sections_missing"],
+                "notes": scores["section_completeness"]["notes"]
+            },
+            "formatting_safety": {
+                "score": scores["formatting_safety"]["score"],
+                "issues_detected": scores["formatting_safety"]["issues_detected"],
+                "notes": scores["formatting_safety"]["notes"]
+            },
+            "quantified_achievements": {
+                "score": scores["quantified_achievements"]["score"],
+                "examples_found": scores["quantified_achievements"]["examples_found"],
+                "suggestions": qualitative.get("top_improvements", [])[:3] if "top_improvements" in qualitative else scores["quantified_achievements"]["suggestions"],
+                "notes": qualitative.get("quantified_achievements_notes", scores["quantified_achievements"]["notes"])
+            },
+            "action_verbs": {
+                "score": scores["action_verbs"]["score"],
+                "strong_verbs_found": qualitative.get("strong_verbs_found", scores["action_verbs"]["strong_verbs_found"]),
+                "weak_phrases": qualitative.get("weak_phrases", scores["action_verbs"]["weak_phrases"]),
+                "notes": qualitative.get("action_verbs_notes", scores["action_verbs"]["notes"])
+            },
+            "top_improvements": qualitative.get("top_improvements", [])
+        }
 
-    raise HTTPException(status_code=503, detail="AI providers exhausted.")
+        return AnalyzeResponse(success=True, provider=provider, data=merged_data)
+        
+    except Exception as e:
+        log.error("ATS Scorer pipeline crash: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"ATS Scorer pipeline crash: {str(e)}")
 
 
 @app.post("/profile/github-sync", response_model=ProfileSyncResponse, tags=["Profile"])

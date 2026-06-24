@@ -3,7 +3,7 @@
 > **Language:** Python 3.13  
 > **Framework:** FastAPI + Uvicorn  
 > **Port:** 5001  
-> **Role:** Handles all AI-powered ATS resume analysis (Gemini 2.0 Flash → Groq fallback)
+> **Role:** Hybrid NLP & LLM Resume ATS Analyzer, Profile Synthesizer, and Interview Evaluator
 
 ---
 
@@ -38,29 +38,54 @@ Groq key  : ✅ configured
 INFO:     Uvicorn running on http://0.0.0.0:5001
 ```
 
-## API Docs
+## Run Tests
 
-Visit **http://localhost:5001/docs** — automatic interactive Swagger UI (FastAPI built-in)
-
-## Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Service info |
-| GET | `/health` | Health check |
-| POST | `/analyze` | Analyze resume vs job description |
-
-## Architecture
-
-```
-React Client (:5173)
-      ↓
-Node.js / Express (:5000)   ← Main Server
-      ↓ HTTP POST /analyze
-Python / FastAPI (:5001)    ← This microservice
-      ↓              ↓
-  Gemini API      Groq API
-  (Plan A)        (Plan B)
+To run the Pytest suite (includes health check and mocked LLM / analyze endpoint verification):
+```powershell
+pytest
 ```
 
-The main Node.js server calls this service. If this service is offline, Node.js **automatically falls back** to direct AI calls — so the app always works.
+---
+
+## ATS Scorer Engine (Hybrid Architecture)
+
+Instead of relying purely on an LLM's subjective (and sometimes hallucinatory) score predictions, the ATS scanner implements a robust **Hybrid Pipeline** combining deterministic NLP calculations with LLM qualitative insights:
+
+```
+                  [ Resume PDF ]       [ Job Description ]
+                         \                   /
+                          \                 /
+                           ▼               ▼
+                   [ Programmatic NLP Scoring Engine ]
+                       (services/ats_scoring.py)
+                   ┌─────────────────────────────────┐
+                   │ • Keyword Overlap via TF-IDF    │
+                   │ • Cosine Semantic Similarity    │
+                   │ • Heading Section Verification   │
+                   │ • Layout & Formatting Rules     │
+                   └─────────────────────────────────┘
+                                    │
+                                    │ (Calculated Metrics & Scores)
+                                    ▼
+                     [ LLM Qualitative Evaluator ]
+                         (Gemini / Groq Fallback)
+                   ┌─────────────────────────────────┐
+                   │ • 2-3 Sentence Match Verdict    │
+                   │ • Specific Action Verb Analysis │
+                   │ • Formatting Improvement Suggestions│
+                   └─────────────────────────────────┘
+                                    │
+                                    ▼
+                         [ Combined ATS Report ]
+```
+
+### Deterministic Calculations:
+1.  **Keyword/Skills Overlap (50% overall weight):** Uses a curated Tech Skills lookup merged with dynamic top TF-IDF keywords extracted from the job description.
+2.  **Semantic Similarity (30% overall weight):** Computes a cosine similarity score of the resume and job description using Gemini `text-embedding-004` embeddings (falls back to a local scikit-learn TF-IDF similarity model offline/during testing).
+3.  **Section & Formatting Checks (20% overall weight):** Check layout details:
+    *   **Section Completeness:** Detects standard headings ("Experience", "Education", "Skills", "Summary").
+    *   **Formatting Safety:** Validates email, telephone, list indicators (bullet points), and capitals overuse.
+    *   **Quantified Achievements:** Detects percentages/numbers indicating project impact.
+    *   **Action Verbs:** Identifies strong action verbs and warns on weak phrases.
+
+The programmatic scores are passed *into* the LLM prompt as context. This ensures that the generated review, action verb critiques, and improvements are fully aligned with the actual mathematical scores, rather than guessing them.

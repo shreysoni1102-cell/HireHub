@@ -23,7 +23,7 @@ hirehub/
 - Real-time Socket.io chat between recruiters and seekers
 
 ### AI Features (Python FastAPI microservice)
-- **ATS Resume Scanner** — upload PDF resume, get keyword match score against a job description
+- **ATS Resume Scanner** — Programmatic hybrid NLP pipeline extracting matching keywords (TF-IDF + curated skills directory), scoring semantic similarity via Gemini Embeddings (with scikit-learn fallback), and conducting structural completeness/formatting checks, coupled with qualitative LLM feedback.
 - **Resume Optimizer** — AI rewrites resume to better match the job description with a split diff view
 - **AI Interview Bot** — practice interviews with AI-generated questions and automated evaluation scorecard
 
