@@ -6,6 +6,7 @@ build/
 *.log
 .DS_Store
 coverage/
+*.timestamp-*.mjs
 
 # Python AI Microservice
 ai-service/venv/
