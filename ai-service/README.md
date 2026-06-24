@@ -82,10 +82,13 @@ Instead of relying purely on an LLM's subjective (and sometimes hallucinatory) s
 ### Deterministic Calculations:
 1.  **Keyword/Skills Overlap (50% overall weight):** Uses a curated Tech Skills lookup merged with dynamic top TF-IDF keywords extracted from the job description.
 2.  **Semantic Similarity (30% overall weight):** Computes a cosine similarity score of the resume and job description using Gemini `text-embedding-004` embeddings (falls back to a local scikit-learn TF-IDF similarity model offline/during testing).
-3.  **Section & Formatting Checks (20% overall weight):** Check layout details:
+3.  **Section & Formatting Checks (20% overall weight):** Analyzes document layout, structure, and profile metadata:
     *   **Section Completeness:** Detects standard headings ("Experience", "Education", "Skills", "Summary").
     *   **Formatting Safety:** Validates email, telephone, list indicators (bullet points), and capitals overuse.
     *   **Quantified Achievements:** Detects percentages/numbers indicating project impact.
     *   **Action Verbs:** Identifies strong action verbs and warns on weak phrases.
+    *   **Years of Experience Matcher:** Parses and compares the required experience years in the Job Description against the resume's experience duration, flagging gaps.
+    *   **Education Degree Matcher:** Parses degree requirements (Bachelor's, Master's, PhD) in the Job Description and checks if they are met in the resume.
+    *   **Contact Info Extractor:** Programmatically extracts contact emails and phone numbers, ensuring formatting safety and complete applicant profiles.
 
 The programmatic scores are passed *into* the LLM prompt as context. This ensures that the generated review, action verb critiques, and improvements are fully aligned with the actual mathematical scores, rather than guessing them.
