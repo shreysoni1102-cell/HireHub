@@ -152,6 +152,36 @@ Test accounts (password: `Password123!`):
 
 ---
 
+## 7. Production Deployment
+
+This monorepo can be deployed to cloud hosting platforms (e.g. Render, Railway, AWS, Vercel).
+
+### A. React Client (Frontend)
+*   **Hosting:** Deploy to **Vercel**, **Netlify**, or **Cloudflare Pages**.
+*   **Build Settings:**
+    *   Build Command: `npm run build`
+    *   Output Directory: `dist`
+*   **Environment Variables:** Set `VITE_API_URL` to point to your live Express backend domain.
+
+### B. Node.js Express Server (Backend)
+*   **Hosting:** Deploy to **Render Web Service** or **Railway**.
+*   **Database:** Use a hosted **MongoDB Atlas** database cluster.
+*   **Environment Variables:**
+    *   `MONGODB_URI`: Live MongoDB connection string.
+    *   `JWT_SECRET`: Secure cryptographic secret string.
+    *   `CLIENT_URL`: Domain of your live React frontend.
+    *   `PORT`: Dynamic port assigned by the provider (e.g. `process.env.PORT`).
+
+### C. Python FastAPI AI Service
+*   **Hosting:** Deploy to **Render** or **Railway** as a Python Web Service.
+*   **Environment Variables:**
+    *   `GEMINI_API_KEY`: API key from Google AI Studio.
+    *   `GROQ_API_KEY`: API key from Groq console.
+    *   `AI_SERVICE_PORT`: Dynamic port assigned by the provider (FastAPI will listen on `0.0.0.0`).
+*   **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+---
+
 ## License
 
 MIT — suitable for portfolio and learning use.

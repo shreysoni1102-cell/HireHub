@@ -1,12 +1,18 @@
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 build/
+**/build/
 .env
+**/.env
 .env.local
+**/.env.local
 *.log
 .DS_Store
 coverage/
 *.timestamp-*.mjs
+**/*.timestamp-*.mjs
 
 # Python AI Microservice
 ai-service/venv/
@@ -18,8 +24,3 @@ __pycache__/
 # Local documentation
 HIREHUB_SEM7_ROADMAP.md
 implementation_plan.md
-
-# Python
-ai-service/venv/
-ai-service/__pycache__/
-ai-service/*.pyc

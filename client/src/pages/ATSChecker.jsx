@@ -2,11 +2,11 @@ import { useState } from 'react';
 import api from '../api/axios.js';
 
 const GRADE_STYLE = {
-  A: { bg: 'bg-green-50',  border: 'border-green-300',  text: 'text-green-700',  ring: '#22c55e', label: '🏆 Excellent' },
-  B: { bg: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-700',   ring: '#3b82f6', label: '👍 Good' },
-  C: { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700', ring: '#f59e0b', label: '⚠️ Average' },
-  D: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700', ring: '#f97316', label: '📉 Below Average' },
-  F: { bg: 'bg-red-50',    border: 'border-red-300',    text: 'text-red-700',    ring: '#ef4444', label: '❌ Poor Match' },
+  A: { bg: 'bg-green-50 dark:bg-green-950/20',  border: 'border-green-300 dark:border-green-900/50',  text: 'text-green-700 dark:text-green-300',  ring: '#22c55e', label: '🏆 Excellent' },
+  B: { bg: 'bg-blue-50 dark:bg-blue-950/20',   border: 'border-blue-300 dark:border-blue-900/50',   text: 'text-blue-700 dark:text-blue-300',   ring: '#3b82f6', label: '👍 Good' },
+  C: { bg: 'bg-yellow-50 dark:bg-yellow-950/20', border: 'border-yellow-300 dark:border-yellow-900/50', text: 'text-yellow-700 dark:text-yellow-300', ring: '#f59e0b', label: '⚠️ Average' },
+  D: { bg: 'bg-orange-50 dark:bg-orange-950/20', border: 'border-orange-300 dark:border-orange-900/50', text: 'text-orange-700 dark:text-orange-300', ring: '#f97316', label: '📉 Below Average' },
+  F: { bg: 'bg-red-50 dark:bg-red-950/20',    border: 'border-red-300 dark:border-red-900/50',    text: 'text-red-700 dark:text-red-300',    ring: '#ef4444', label: '❌ Poor Match' },
 };
 
 function ScoreCircle({ score, grade }) {

@@ -211,6 +211,96 @@ def check_action_verbs(resume_text: str) -> Tuple[List[str], List[str]]:
             
     return verbs_found[:10], phrases_found
 
+# ── NEW ADVANCED SCANNERS ──────────────────────────────────────────────────────────
+
+def extract_experience_years(text: str) -> int:
+    """Scans text to find maximum years of experience mentioned."""
+    matches = re.findall(r'\b(\d+)\+?\s*(?:year|yr)s?\b', text.lower())
+    if not matches:
+        return 0
+    return max(int(m) for m in matches)
+
+def check_years_experience(resume_text: str, job_description: str) -> Dict[str, Any]:
+    """Compares required experience years in JD vs resume years."""
+    required = extract_experience_years(job_description)
+    candidate = extract_experience_years(resume_text)
+    
+    gap = max(0, required - candidate)
+    
+    if required == 0:
+        notes = "No specific years of experience explicitly demanded in job description."
+        match = True
+    elif gap == 0:
+        notes = f"Experience match: Candidate lists {candidate}+ years, matching the required {required} years."
+        match = True
+    else:
+        notes = f"Experience gap: Job description lists {required} years, but resume mentions {candidate} years."
+        match = False
+        
+    return {
+        "match": match,
+        "required_years": required,
+        "candidate_years": candidate,
+        "gap_years": gap,
+        "notes": notes
+    }
+
+def check_education_match(resume_text: str, job_description: str) -> Dict[str, Any]:
+    """Scans for degree achievements and requirements alignment."""
+    degrees = {
+        "bachelor": ["bachelor", "b.s", "bs", "b.a", "ba", "undergraduate"],
+        "master": ["master", "m.s", "ms", "m.b.a", "mba", "postgraduate"],
+        "phd": ["phd", "p.h.d", "doctorate", "doctor of philosophy"]
+    }
+    
+    jd_lower = job_description.lower()
+    required_degrees = []
+    for deg, keywords in degrees.items():
+        if any(re.search(r'\b' + re.escape(kw) + r'\b', jd_lower) for kw in keywords):
+            required_degrees.append(deg)
+            
+    if not required_degrees:
+        return {"match": True, "notes": "No specific degree requirements identified in the job description."}
+        
+    resume_lower = resume_text.lower()
+    matched_degrees = []
+    missing_degrees = []
+    for deg in required_degrees:
+        keywords = degrees[deg]
+        if any(re.search(r'\b' + re.escape(kw) + r'\b', resume_lower) for kw in keywords):
+            matched_degrees.append(deg.capitalize())
+        else:
+            missing_degrees.append(deg.capitalize())
+            
+    if missing_degrees:
+        return {
+            "match": False,
+            "matched": matched_degrees,
+            "missing": missing_degrees,
+            "notes": f"Degree gap: JD references {', '.join(missing_degrees)} degree, which was not found in the resume."
+        }
+    return {
+        "match": True,
+        "matched": matched_degrees,
+        "missing": [],
+        "notes": f"Education match: Resume mentions matching {', '.join(matched_degrees)} degree."
+    }
+
+def extract_contact_details(resume_text: str) -> Dict[str, str]:
+    """Extracts contact info programmatically."""
+    email_pattern = r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
+    phone_pattern = r'(\+?\d{1,4}[-.\s]??)?(\(?\d{3}\)?[-.\s]??)?\d{3}[-.\s]??\d{4,6}'
+    
+    email_match = re.search(email_pattern, resume_text)
+    phone_match = re.search(phone_pattern, resume_text)
+    
+    return {
+        "email": email_match.group(0) if email_match else "Not found",
+        "phone": phone_match.group(0) if phone_match else "Not found"
+    }
+
+# ───────────────────────────────────────────────────────────────────────────
+
 def get_grade(score: float) -> str:
     if score >= 85:
         return "A"
@@ -259,19 +349,29 @@ def score_ats_resume(resume_text: str, job_description: str) -> Dict[str, Any]:
     # 2. Semantic Similarity Check
     similarity = get_semantic_similarity(resume_text, job_description)
     
-    # 3. Section Completeness Check (4 headings)
+    # 3. Advanced Matching Scanners
+    exp_match = check_years_experience(resume_text, job_description)
+    edu_match = check_education_match(resume_text, job_description)
+    contact_info = extract_contact_details(resume_text)
+    
+    # 4. Section Completeness Check (4 headings)
     sections_found, sections_missing = check_section_completeness(resume_text)
     section_ratio = len(sections_found) / 4.0 if sections_found else 0.0
     
-    # 4. Formatting Safety Checks (4 categories checks)
+    # 5. Formatting Safety Checks (4 categories checks)
     format_issues = check_formatting_safety(resume_text)
+    # Deduct points if missing contact info in the advanced scanner
+    if contact_info["email"] == "Not found" and "Missing email contact details" not in format_issues:
+        format_issues.append("Missing email contact details")
+    if contact_info["phone"] == "Not found" and "Missing telephone contact details" not in format_issues:
+        format_issues.append("Missing telephone contact details")
     format_ratio = max(0.0, 1.0 - (len(format_issues) / 4.0))
     
-    # 5. Quantified Achievements
+    # 6. Quantified Achievements
     examples, suggestions = check_quantified_achievements(resume_text)
     achievements_ratio = 1.0 if len(examples) >= 2 else (0.5 if len(examples) == 1 else 0.0)
     
-    # 6. Action Verbs
+    # 7. Action Verbs
     verbs_found, weak_phrases = check_action_verbs(resume_text)
     verb_ratio = 1.0 if (len(verbs_found) >= 4 and len(weak_phrases) == 0) else (0.7 if len(verbs_found) >= 2 else 0.4)
     
@@ -289,10 +389,14 @@ def score_ats_resume(resume_text: str, job_description: str) -> Dict[str, Any]:
     fmt_score = round(15 * (0.667 * similarity + 0.333 * format_ratio))
     
     # quantified_achievements.score (0-15): 10 points keyword overlap + 5 points achievements ratio
-    quant_score = round(15 * (0.667 * overlap_ratio + 0.333 * achievements_ratio))
+    # Modify slightly based on experience gaps
+    exp_factor = 1.0 if exp_match["match"] else 0.8
+    quant_score = round(15 * (0.667 * overlap_ratio + 0.333 * achievements_ratio) * exp_factor)
     
     # action_verbs.score (0-10): 5 points similarity + 5 points verbs ratio
-    act_score = round(10 * (0.5 * similarity + 0.5 * verb_ratio))
+    # Modify slightly based on education matches
+    edu_factor = 1.0 if edu_match["match"] else 0.9
+    act_score = round(10 * (0.5 * similarity + 0.5 * verb_ratio) * edu_factor)
     
     # Sum up category scores to enforce strict consistency
     final_score = kw_score + sec_score + fmt_score + quant_score + act_score
@@ -300,9 +404,9 @@ def score_ats_resume(resume_text: str, job_description: str) -> Dict[str, Any]:
     
     # Safety notes mapping
     kw_notes = f"Matched {len(matched_keywords)} of {len(jd_keywords)} relevant skills."
-    sec_notes = f"Detected {len(sections_found)} of 4 required core sections."
+    sec_notes = f"Detected {len(sections_found)} of 4 required core sections. {edu_match['notes']}"
     fmt_notes = f"Detected {len(format_issues)} formatting issues." if format_issues else "Resume layout is highly readable."
-    quant_notes = f"Found {len(examples)} quantified achievements."
+    quant_notes = f"Found {len(examples)} quantified achievements. {exp_match['notes']}"
     act_notes = f"Found {len(verbs_found)} strong action verbs and {len(weak_phrases)} weak phrasing instances."
 
     return {
@@ -336,5 +440,8 @@ def score_ats_resume(resume_text: str, job_description: str) -> Dict[str, Any]:
             "strong_verbs_found": verbs_found,
             "weak_phrases": weak_phrases,
             "notes": act_notes
-        }
+        },
+        "experience_match": exp_match,
+        "education_match": edu_match,
+        "contact_info": contact_info
     }
